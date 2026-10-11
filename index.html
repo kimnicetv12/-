@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI 면접 훈련기</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>AI 면접 훈련기</h1>
+    <span class="tagline">말하면 AI 면접관이 듣고, 묻고, 채점합니다</span>
+  </header>
+
+  <main>
+    <!-- 1. 설정 -->
+    <section id="screen-setup" class="screen">
+      <div id="support-warning" class="notice warn" hidden></div>
+
+      <form id="setup-form" class="card">
+        <h2>면접 설정</h2>
+
+        <div class="grid">
+          <label>지원 분야
+            <select name="field" id="field-select"></select>
+          </label>
+          <label>회사 / 직무 (선택)
+            <input name="company" placeholder="예: KBS 아나운서, 삼성전자 SW개발">
+          </label>
+          <label>면접 유형
+            <select name="mode">
+              <option value="mixed">종합 (인성 + 직무)</option>
+              <option value="personality">인성 면접</option>
+              <option value="job">직무 면접</option>
+              <option value="pressure">압박 면접</option>
+            </select>
+          </label>
+          <label>면접관 성향
+            <select name="persona">
+              <option value="standard">표준 (실제 공채 기준)</option>
+              <option value="kind">온화함</option>
+              <option value="strict">깐깐함 (꼬리질문 많음)</option>
+            </select>
+          </label>
+          <label>질문 수
+            <select name="count">
+              <option value="3">3개 (짧게)</option>
+              <option value="5" selected>5개</option>
+              <option value="7">7개</option>
+              <option value="10">10개 (실전)</option>
+            </select>
+          </label>
+          <label>답변 제한 시간
+            <select name="timeLimit">
+              <option value="60">60초</option>
+              <option value="90" selected>90초</option>
+              <option value="120">120초</option>
+            </select>
+          </label>
+          <label>피드백 시점
+            <select name="feedbackTiming">
+              <option value="each">답변마다 바로 보기 (연습 모드)</option>
+              <option value="end">면접 끝나고 몰아서 (실전 모드)</option>
+            </select>
+          </label>
+          <label>답변 입력 방식
+            <select name="inputMode" id="input-mode">
+              <option value="voice">음성 (마이크)</option>
+              <option value="text">타이핑 (전달력 채점 제외)</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="checks">
+          <label class="check"><input type="checkbox" name="tts" checked> 질문을 소리로 읽어주기</label>
+          <label class="check"><input type="checkbox" name="followUps" checked> 꼬리질문 허용 (AI 모드)</label>
+          <label class="check"><input type="checkbox" name="autoStart"> 질문을 다 읽으면 바로 답변 녹음 시작</label>
+        </div>
+
+        <label class="block">자기소개서 / 이력 요약 (선택 · AI 모드에서 맞춤 질문에 사용)
+          <textarea name="resume" rows="4" placeholder="핵심 경험, 프로젝트, 지원 동기 등을 붙여 넣으면 그 내용을 파고드는 질문이 나옵니다."></textarea>
+        </label>
+
+        <details class="api-box" id="api-box">
+          <summary>AI 면접관 연결 (Claude API 키) — <span id="api-status">미연결: 기본 질문 + 간이 채점</span></summary>
+          <p class="hint">
+            키를 넣으면 Claude가 실제 면접관처럼 답변을 듣고 꼬리질문을 던지며, 내용까지 채점합니다.
+            키가 없어도 기본 질문 은행과 말하기 지표 기반의 간이 채점으로 연습할 수 있습니다.
+            키는 이 브라우저 밖으로는 Anthropic API에만 전송됩니다.
+          </p>
+          <div class="row">
+            <input type="password" name="apiKey" id="api-key" placeholder="sk-ant-..." autocomplete="off">
+            <label class="check"><input type="checkbox" name="rememberKey" id="remember-key"> 이 브라우저에 저장</label>
+          </div>
+        </details>
+
+        <div class="actions">
+          <button type="button" id="mic-test" class="secondary">마이크 테스트</button>
+          <button type="submit" class="primary">면접 시작</button>
+        </div>
+        <div id="mic-test-box" class="mic-test" hidden>
+          <div class="meter"><div class="meter-fill" id="test-meter"></div></div>
+          <p id="mic-test-text" class="muted">아무 말이나 해 보세요. 인식된 문장이 여기 표시됩니다.</p>
+        </div>
+      </form>
+
+      <div class="card" id="history-card" hidden>
+        <h2>지난 연습 기록</h2>
+        <table class="history">
+          <thead><tr><th>날짜</th><th>분야</th><th>유형</th><th>질문</th><th>종합</th></tr></thead>
+          <tbody id="history-body"></tbody>
+        </table>
+        <button type="button" id="clear-history" class="link">기록 지우기</button>
+      </div>
+    </section>
+
+    <!-- 2. 면접 진행 -->
+    <section id="screen-interview" class="screen" hidden>
+      <div class="interview-head">
+        <span id="progress-label" class="badge"></span>
+        <span id="mode-label" class="badge subtle"></span>
+        <span id="engine-label" class="badge subtle"></span>
+        <button type="button" id="quit" class="link">면접 종료</button>
+      </div>
+
+      <div class="card interviewer">
+        <div class="avatar" aria-hidden="true">
+          <svg viewBox="0 0 48 48" width="48" height="48"><circle cx="24" cy="17" r="9" fill="currentColor"/><path d="M6 46c2-11 9-16 18-16s16 5 18 16z" fill="currentColor"/></svg>
+        </div>
+        <div class="bubble">
+          <p id="reaction" class="reaction" hidden></p>
+          <span id="followup-tag" class="tag" hidden>꼬리질문</span>
+          <p id="question-text" class="question"></p>
+          <button type="button" id="replay" class="link small">다시 듣기</button>
+        </div>
+      </div>
+
+      <div class="card answer">
+        <div class="timer-row">
+          <span id="timer" class="timer">0:00</span>
+          <div class="timebar"><div id="timebar-fill"></div></div>
+          <span id="time-limit-label" class="muted"></span>
+        </div>
+        <div class="meter" id="live-meter-wrap"><div class="meter-fill" id="live-meter"></div></div>
+
+        <div id="live-transcript" class="transcript" aria-live="polite"></div>
+        <textarea id="answer-edit" rows="5" hidden></textarea>
+        <p id="edit-hint" class="hint" hidden>음성 인식이 틀린 단어가 있으면 고친 뒤 제출하세요. 전달력 지표는 원래 녹음 기준으로 계산됩니다.</p>
+
+        <div class="actions">
+          <button type="button" id="btn-start" class="primary">답변 시작</button>
+          <button type="button" id="btn-stop" class="danger" hidden>답변 완료</button>
+          <button type="button" id="btn-retry" class="secondary" hidden>다시 답변</button>
+          <button type="button" id="btn-submit" class="primary" hidden>제출</button>
+        </div>
+        <p class="hint" id="key-hint">스페이스바로 답변 시작/완료</p>
+      </div>
+
+      <div id="evaluating" class="card center" hidden>
+        <div class="spinner" aria-hidden="true"></div>
+        <p>면접관이 답변을 검토하는 중…</p>
+      </div>
+
+      <div id="feedback" class="card" hidden></div>
+    </section>
+
+    <!-- 3. 결과 -->
+    <section id="screen-report" class="screen" hidden>
+      <div id="report"></div>
+      <div class="actions">
+        <button type="button" id="again" class="primary">같은 설정으로 다시</button>
+        <button type="button" id="home" class="secondary">처음으로</button>
+        <button type="button" id="download" class="secondary">결과 저장 (.txt)</button>
+        <button type="button" id="print" class="secondary">인쇄 / PDF</button>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" role="status" hidden></div>
+
+  <script src="js/questions.js"></script>
+  <script src="js/metrics.js"></script>
+  <script src="js/speech.js"></script>
+  <script src="js/claude.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
