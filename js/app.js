@@ -248,23 +248,28 @@
     testRec.start();
   }
 
-  /** 하루라도 연습한 날이 이어진 횟수 */
-  function streakDays(list) {
+  /** 이번 주(월~일) 날짜 목록과 그날 연습했는지 */
+  function weekStamps(list) {
     const days = new Set(list.map((r) => new Date(r.date).toDateString()));
-    let n = 0;
-    const d = new Date();
-    if (!days.has(d.toDateString())) d.setDate(d.getDate() - 1); // 오늘 안 했어도 어제까지 이어졌으면 유지
-    while (days.has(d.toDateString())) {
-      n += 1;
-      d.setDate(d.getDate() - 1);
-    }
-    return n;
+    const today = new Date();
+    const monday = new Date(today);
+    monday.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+    return ['월', '화', '수', '목', '금', '토', '일'].map((name, i) => {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      return { name, done: days.has(d.toDateString()), today: d.toDateString() === today.toDateString() };
+    });
   }
 
   function renderHistory() {
     const list = store(STORE.history) || [];
-    $('#streak').textContent = `🔥 ${streakDays(list)}`;
-    $('#best').textContent = `⭐ ${list.length ? Math.max(...list.map((r) => r.overall)) : '-'}`;
+    const week = weekStamps(list);
+    $('#stamps').replaceChildren(...week.map((d) =>
+      h('li', { class: `slot${d.done ? ' done' : ''}${d.today ? ' today' : ''}` },
+        h('span', { class: 'ink' }, d.done ? h('span', {}, '참', h('br'), '잘했어요') : ''),
+        h('small', {}, d.name))));
+    $('#week-count').textContent = `${week.filter((d) => d.done).length} / 7`;
+    $('#best').textContent = `최고 기록 ${list.length ? `${Math.max(...list.map((r) => r.overall))}점` : '-'}`;
     $('#history-card').hidden = !list.length;
     $('#history-list').replaceChildren(
       ...list.slice(0, 10).map((r) =>
@@ -312,9 +317,14 @@
   }
 
   function updateProgress() {
-    const pct = Math.round((state.results.length / state.settings.count) * 100);
-    $('#progress-fill').style.width = `${pct}%`;
-    $('#progress').setAttribute('aria-valuenow', pct);
+    const done = state.results.length;
+    $('#skewer').replaceChildren(...Array.from({ length: state.settings.count }, (_, i) => {
+      const r = state.results[i];
+      const cls = r ? tierOf(r.evaluation.overall) : i === done ? 'now' : '';
+      return h('li', { class: `bead ${cls}`, title: r ? `Q${i + 1}: ${r.evaluation.overall}점` : `Q${i + 1}` });
+    }));
+    $('#skewer').setAttribute('aria-label', `${state.settings.count}문항 중 ${done}문항 완료`);
+    $('#q-index').textContent = `Q${Math.min(done + 1, state.settings.count)}`;
     $('#progress-label').textContent = `${Math.min(state.results.length + 1, state.settings.count)}/${state.settings.count}`;
   }
 
@@ -410,6 +420,7 @@
     state.phase = 'recording';
     $('#live-transcript').replaceChildren();
     Mascot.setState($('#interviewer'), 'listening');
+    $('#rec').hidden = false;
     state.recognizer.start();
     startTimer();
     setMic(['stop']);
@@ -420,6 +431,7 @@
     state.phase = 'review';
     clearInterval(state.timer);
     setMic([]);
+    $('#rec').hidden = true;
     Mascot.setLevel($('#interviewer'), 0);
     Mascot.setState($('#interviewer'), 'idle');
     state.raw = await state.recognizer.stop();
@@ -501,8 +513,12 @@
     }
   }
 
+  function tierOf(score) {
+    return score >= 75 ? 'good' : score >= 55 ? 'okay' : 'low';
+  }
+
   function moodFor(score) {
-    return score >= 75 ? 'happy' : score >= 55 ? 'cheer' : 'sad';
+    return { good: 'happy', okay: 'cheer', low: 'sad' }[tierOf(score)];
   }
 
   function nextQuestion(evaluation, remaining) {
@@ -515,27 +531,34 @@
   }
 
   function renderSheet(ev, analysis, next, reaction) {
-    const tier = ev.overall >= 75 ? 'good' : ev.overall >= 55 ? 'okay' : 'low';
-    const title = { good: '훌륭해요! 🎉', okay: '좋아요, 조금만 더!', low: '괜찮아요, 다시 해봐요!' }[tier];
+    const tier = tierOf(ev.overall);
+    const title = { good: '아주 좋았어요!', okay: '좋아요, 조금만 더!', low: '괜찮아요, 다시 해봐요!' }[tier];
     const sheet = $('#sheet');
-    sheet.className = `sheet ${tier}`;
+    sheet.className = `memo-wrap ${tier}`;
     $('#sheet-body').replaceChildren(
-      h('div', { class: 'sheet-head' },
+      h('div', { class: 'memo-head' },
         mascot(moodFor(ev.overall), { glasses: state.settings.persona === 'strict' }),
-        h('div', {},
-          h('p', { class: 'sheet-title' }, title),
-          h('p', { class: 'sheet-sub' }, `이번 답변 ${ev.overall}점${ev.source === 'rule' ? ' · 간이 채점' : ''}`))),
+        h('div', { class: 'memo-title' },
+          h('p', { class: 'memo-kicker' }, `면접관 메모 · Q${state.results.length}${ev.source === 'rule' ? ' · 간이 채점' : ''}`),
+          h('p', { class: 'memo-h' }, title)),
+        stamp(`${ev.overall}`, '점', tier)),
       h('div', { class: 'panel' }, scoreBars(ev.scores), deliveryTiles(analysis)),
       h('div', { class: 'panel' }, feedbackLists(ev)),
       h('div', { class: 'actions' },
         h('button', {
           type: 'button',
-          class: 'btn btn-wide',
+          class: 'btn btn-main btn-wide',
           onclick: () => (next ? askQuestion({ ...next, reaction }) : finish()),
-        }, next ? '계속하기' : '결과 보기')),
+        }, next ? '다음 질문' : '성적표 보기')),
     );
     sheet.hidden = false;
     sheet.scrollTop = 0;
+    sheet.querySelector('.actions .btn').focus({ preventScroll: true });
+  }
+
+  /** 도장: 동그란 테두리 안에 큰 글자 + 작은 글자 */
+  function stamp(big, small, tier) {
+    return h('div', { class: `stamp ${tier}`, 'aria-label': `${big}${small}` }, h('b', {}, big), h('small', {}, small));
   }
 
   function scoreBars(scores) {
@@ -587,6 +610,7 @@
     state.phase = 'done';
     state.current = { question: null };
     clearInterval(state.timer);
+    $('#rec').hidden = true;
     Speech.stopSpeaking();
     if (state.recognizer) state.recognizer.abort();
     if (state.meter) state.meter.stop();
@@ -652,15 +676,21 @@
     }
 
     $('#report').replaceChildren(
-      h('div', { class: 'result-hero' },
-        mascot(summary.overall >= 70 ? 'happy' : 'cheer', { glasses: s.persona === 'strict' }),
-        h('h1', {}, '면접 완료!'),
-        h('p', { class: 'grade-line' }, `${AI.MODE_LABELS[s.mode]} · ${s.company || s.fieldLabel} · ${state.results.length}문항`)),
-      h('div', { class: 'stat-tiles' },
-        statTile('총점', `${summary.overall}`, '100점 만점', 't-yellow'),
-        statTile('등급', grade, summary.overall >= 70 ? '이대로만 가요!' : '조금만 더!', summary.overall >= 70 ? 't-green' : 't-orange'),
-        voiceAnswers ? statTile('말 속도', summary.avgRate ? `${summary.avgRate}` : '—', `적정 ${Metrics.IDEAL_RATE.min}~${Metrics.IDEAL_RATE.max}`, 't-blue') : '',
-        voiceAnswers ? statTile('군말', `${summary.totalFillers}회`, `습관어 ${summary.totalHabits} · 끊김 ${summary.totalLongPauses}`, 't-red') : ''),
+      h('div', { class: 'report-card' },
+        h('div', { class: 'report-top' },
+          h('div', {},
+            h('p', { class: 'memo-kicker' }, `${new Date(state.report.date).toLocaleDateString('ko-KR')} · ${AI.MODE_LABELS[s.mode]}`),
+            h('h1', {}, '면접 성적표'),
+            h('p', { class: 'grade-line' }, `${s.company || s.fieldLabel} · ${state.results.length}문항`)),
+          mascot(summary.overall >= 70 ? 'happy' : 'cheer', { glasses: s.persona === 'strict' })),
+        h('div', { class: 'report-score' },
+          h('div', {}, h('span', { class: 'total' }, `${summary.overall}`), h('span', { class: 'of' }, ' / 100')),
+          stamp(grade, '', `big ${tierOf(summary.overall)}`)),
+        h('div', { class: 'stat-tiles' },
+          voiceAnswers ? statTile('평균 말 속도', summary.avgRate ? `${summary.avgRate}` : '—', `적정 ${Metrics.IDEAL_RATE.min}~${Metrics.IDEAL_RATE.max}음절/분`, 't-blue') : '',
+          voiceAnswers ? statTile('군말', `${summary.totalFillers}회`, '음, 어 등', 't-orange') : '',
+          voiceAnswers ? statTile('습관어', `${summary.totalHabits}회`, '약간, 뭔가 등', 't-orange') : '',
+          voiceAnswers ? statTile('긴 끊김', `${summary.totalLongPauses}회`, '2.5초 이상', 't-red') : '')),
       h('div', { class: 'card' }, h('h2', {}, '📊 항목별 평균'), scoreBars(summary.avg)),
       aiBox || '',
       h('div', { class: 'card' },
@@ -680,7 +710,7 @@
 
   function confetti() {
     const box = $('#confetti');
-    const colors = ['#58cc02', '#1cb0f6', '#ffc800', '#ff4b4b', '#ce82ff', '#ff9600'];
+    const colors = ['#ffb3c1', '#ffd59e', '#bfe3b4', '#c9ccff', '#fff3e6', '#f7a6b9'];
     box.replaceChildren(...Array.from({ length: 60 }, (_, i) => h('i', {
       style: `left:${Math.random() * 100}%;background:${colors[i % colors.length]};animation-duration:${1.8 + Math.random() * 1.6}s;animation-delay:${Math.random() * 0.5}s;transform:rotate(${Math.random() * 360}deg)`,
     })));

@@ -6,7 +6,7 @@
   <title>말랑 면접</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&family=Jua&display=swap">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
   <link rel="stylesheet" href="style.css">
 </head>
@@ -19,8 +19,7 @@
         <span class="brand-name">말랑 면접</span>
       </div>
       <div class="stats">
-        <span class="stat-pill fire" id="streak" title="연속 연습한 날">🔥 0</span>
-        <span class="stat-pill gem" id="best" title="최고 점수">⭐ -</span>
+        <span class="stat-pill" id="best" title="최고 점수">최고 기록 -</span>
       </div>
     </header>
 
@@ -28,9 +27,17 @@
       <div class="hello">
         <div class="mascot-lg" id="hello-mascot"></div>
         <div class="bubble bubble-left">
-          <p id="hello-text">안녕하세요! 저는 면접관 <b>말랑이</b>예요.<br>오늘은 어떤 면접을 연습해 볼까요?</p>
+          <p id="hello-text">안녕하세요! 저는 찹쌀떡 면접관 <b>말랑이</b>예요.<br>오늘은 어떤 면접을 연습해 볼까요?</p>
         </div>
       </div>
+
+      <section class="stamp-board" aria-label="이번 주 연습 도장판">
+        <div class="stamp-head">
+          <h2>이번 주 연습 도장판</h2>
+          <span id="week-count" class="hint">0 / 7</span>
+        </div>
+        <ol class="stamps" id="stamps"></ol>
+      </section>
 
       <div id="support-warning" class="notice warn" hidden></div>
 
@@ -126,7 +133,7 @@
         </details>
 
         <section class="step" id="history-card" hidden>
-          <h2><span class="step-no">📈</span> 지난 연습</h2>
+          <h2><span class="step-no">✎</span> 지난 연습</h2>
           <ul class="history" id="history-list"></ul>
           <button type="button" id="clear-history" class="link">기록 지우기</button>
         </section>
@@ -139,7 +146,7 @@
         <div class="footer-bar">
           <div class="footer-inner">
             <button type="button" id="mic-test" class="btn btn-ghost">🎤 마이크 테스트</button>
-            <button type="submit" class="btn btn-green btn-wide">면접 시작!</button>
+            <button type="submit" class="btn btn-main btn-wide">면접 시작!</button>
           </div>
         </div>
       </form>
@@ -150,7 +157,7 @@
   <section id="screen-interview" class="screen" hidden>
     <header class="lesson-top">
       <button type="button" id="quit" class="icon-btn" aria-label="면접 종료">✕</button>
-      <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" id="progress"><div class="progress-fill" id="progress-fill"></div></div>
+      <ol class="skewer" id="skewer" aria-label="진행 상황"></ol>
       <span id="progress-label" class="progress-label"></span>
     </header>
 
@@ -163,7 +170,8 @@
 
       <div class="stage">
         <div class="mascot-xl" id="interviewer"></div>
-        <div class="bubble bubble-left q-bubble">
+        <div class="cue">
+          <span class="q-index" id="q-index">Q1</span>
           <p id="reaction" class="reaction" hidden></p>
           <p id="question-text" class="question"></p>
           <button type="button" id="replay" class="speaker" aria-label="다시 듣기" title="다시 듣기">🔊</button>
@@ -172,6 +180,7 @@
 
       <div class="answer-card">
         <div class="timer-row">
+          <span id="rec" class="rec" hidden>REC</span>
           <span id="timer" class="timer-pill">0:00</span>
           <div class="timebar"><div id="timebar-fill"></div></div>
           <span id="time-limit-label" class="hint"></span>
@@ -191,12 +200,12 @@
     <footer class="lesson-foot" id="answer-foot" hidden>
       <div class="footer-inner">
         <button type="button" id="btn-retry" class="btn btn-ghost">다시 답변</button>
-        <button type="button" id="btn-submit" class="btn btn-green btn-wide">제출하기</button>
+        <button type="button" id="btn-submit" class="btn btn-main btn-wide">제출하기</button>
       </div>
     </footer>
 
-    <div id="sheet" class="sheet" hidden>
-      <div class="sheet-inner" id="sheet-body"></div>
+    <div id="sheet" class="memo-wrap" hidden>
+      <div class="memo" id="sheet-body" role="dialog" aria-modal="true" aria-label="면접관 메모"></div>
     </div>
   </section>
 
@@ -208,7 +217,7 @@
         <button type="button" id="download" class="btn btn-ghost btn-sm">💾 저장</button>
         <button type="button" id="print" class="btn btn-ghost btn-sm">🖨️ 인쇄</button>
         <button type="button" id="home" class="btn btn-ghost btn-sm">🏠 처음</button>
-        <button type="button" id="again" class="btn btn-green btn-wide">한 번 더!</button>
+        <button type="button" id="again" class="btn btn-main btn-wide">한 번 더!</button>
       </div>
     </div>
   </section>
