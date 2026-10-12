@@ -299,7 +299,9 @@
 
     Mascot.mount($('#interviewer'), { state: 'idle', glasses: settings.persona === 'strict' });
     $('#mode-label').textContent = `${AI.MODE_LABELS[settings.mode]} · ${settings.company || settings.fieldLabel}`;
-    $('#engine-label').textContent = settings.ai ? `${settings.ai.provider === 'gemini' ? '✨ Gemini' : '🧠 Claude'} 면접관` : '기본 모드 (간이 채점)';
+    $('#engine-label').textContent = settings.ai
+      ? `🪰 초파리 뇌 채점 + ${settings.ai.provider === 'gemini' ? '✨ Gemini' : '🧠 Claude'} 선생님`
+      : '🪰 초파리 뇌 채점';
     $('#time-limit-label').textContent = `/ ${fmtTime(settings.timeLimit)}`;
     $('#key-hint').hidden = settings.inputMode !== 'voice';
 
@@ -490,11 +492,23 @@
         if (textMode) evaluation.scores.delivery = null;
         evaluation.overall = Metrics.overallFromScores(evaluation.scores);
       } catch (e) {
-        toast(`AI 채점 실패: ${e.message} 이번 답변은 간이 채점으로 대신할게요.`, 7000);
+        toast(`AI 선생님 연결 실패: ${e.message} 이번 답변은 초파리 뇌 혼자 채점할게요.`, 7000);
       }
     }
     if (!evaluation) evaluation = Metrics.ruleBasedEvaluation({ question, analysis, timeLimitSec: state.settings.timeLimit });
     if (state.phase !== 'evaluating') return; // 채점 중 면접 종료
+
+    // 점수는 초파리 뇌가 매긴다. AI 점수는 선생님 점수로 보여주고, 초파리가 그걸 보고 배운다.
+    const fly = FlyBrain.evaluate({ question, transcript, analysis, field: state.settings.field });
+    const teacher = evaluation.source === 'ai' ? { ...evaluation.scores } : null;
+    evaluation.teacherScores = teacher;
+    evaluation.teacherOverall = teacher ? Metrics.overallFromScores(teacher) : null;
+    evaluation.scores = { ...fly.scores };
+    evaluation.overall = Metrics.overallFromScores(evaluation.scores);
+    evaluation.fly = fly;
+    if (teacher) FlyBrain.learn(fly, teacher);
+    FlyBrain.remember({ question, result: fly });
+    FlyBrain.save();
 
     state.results.push({ question, followUp, transcript, analysis, evaluation });
     updateProgress();
@@ -539,10 +553,11 @@
       h('div', { class: 'memo-head' },
         mascot(moodFor(ev.overall), { glasses: state.settings.persona === 'strict' }),
         h('div', { class: 'memo-title' },
-          h('p', { class: 'memo-kicker' }, `면접관 메모 · Q${state.results.length}${ev.source === 'rule' ? ' · 간이 채점' : ''}`),
+          h('p', { class: 'memo-kicker' }, `면접관 메모 · Q${state.results.length} · 🪰 초파리 뇌 채점`),
           h('p', { class: 'memo-h' }, title)),
         stamp(`${ev.overall}`, '점', tier)),
       h('div', { class: 'panel' }, scoreBars(ev.scores), deliveryTiles(analysis)),
+      flyPanel(ev),
       h('div', { class: 'panel' }, feedbackLists(ev)),
       h('div', { class: 'actions' },
         h('button', {
@@ -553,7 +568,43 @@
     );
     sheet.hidden = false;
     sheet.scrollTop = 0;
+    const cv = sheet.querySelector('canvas.fly-canvas');
+    if (cv) FlyView.draw(cv, ev.fly);
     sheet.querySelector('.actions .btn').focus({ preventScroll: true });
+  }
+
+  /** 초파리 뇌가 이 답변을 어떻게 봤는지: 그림 + 인식 결과 + 점수 피드백으로 가르치기 */
+  function flyPanel(ev) {
+    const f = ev.fly;
+    if (!f) return '';
+    const notes = [
+      h('li', {}, '답변 유형: ', h('b', {}, f.typeLabel), ` (확신 ${Math.round(f.typeConfidence * 100)}%)`),
+      h('li', {}, `케년세포 ${FlyBrain.N_KC.toLocaleString()}개 중 ${f.active.length}개가 반응 · 익숙함 ${Math.round(f.familiarity * 100)}%`),
+    ];
+    if (f.similar) {
+      const same = f.similar.sim >= 0.45;
+      notes.push(h('li', { class: 'warn' }, `${same ? '거의 같은 답이에요' : '예전 답변과 많이 닮았어요'} (단어 지문 ${Math.round(f.similar.sim * 100)}% 겹침 · "${f.similar.question.slice(0, 18)}…" 때 답)`));
+    }
+    if (ev.teacherOverall != null) {
+      notes.push(h('li', {}, `✨ AI 선생님 점수 ${ev.teacherOverall}점 → 초파리가 보고 배웠어요 (배운 횟수 ${FlyBrain.stats().lessons}회)`));
+    }
+    const teach = (delta, label) => (e) => {
+      const target = {};
+      for (const [k, v] of Object.entries(ev.scores)) target[k] = v == null ? null : Math.max(0, Math.min(10, v + delta));
+      FlyBrain.learn(f, target, 0.2);
+      FlyBrain.save();
+      e.currentTarget.parentElement.querySelectorAll('button').forEach((b) => (b.disabled = true));
+      toast(`🪰 "${label}" 기억했어요! (배운 횟수 ${FlyBrain.stats().lessons}회)`);
+    };
+    return h('div', { class: 'panel fly' },
+      h('h3', {}, '🪰 초파리 뇌가 본 이 답변'),
+      h('canvas', { class: 'fly-canvas', role: 'img', 'aria-label': `초파리 뇌 활성 그림: 케년세포 ${f.active.length}개 반응` }),
+      h('ul', { class: 'fly-notes' }, notes),
+      h('div', { class: 'fly-teach' },
+        h('span', {}, '이 점수 어때요?'),
+        h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: teach(-1.5, '더 낮아야 해요') }, '더 낮게'),
+        h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: teach(0, '딱 맞아요') }, '딱 맞아요'),
+        h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: teach(1.5, '더 높아야 해요') }, '더 높게')));
   }
 
   /** 도장: 동그란 테두리 안에 큰 글자 + 작은 글자 */
@@ -672,7 +723,7 @@
       aiBox = h('div', { class: 'card ai-loading' }, mascot('thinking'), h('p', {}, '말랑이가 총평을 쓰는 중이에요…'));
     } else if (!s.ai) {
       aiBox = h('div', { class: 'card ai-loading' }, mascot('cheer'),
-        h('p', { class: 'hint' }, '무료 Gemini 키를 연결하면 말랑이가 답변 내용을 직접 읽고 총평과 꼬리질문을 해 줘요. 지금 점수는 말하기 습관과 답변 형식 위주의 간이 채점이에요.'));
+        h('p', { class: 'hint' }, '무료 Gemini 키를 연결하면 AI 선생님이 답변 내용을 읽고 총평·꼬리질문을 해 주고, 초파리 뇌도 그 채점을 보며 더 빨리 배워요.'));
     }
 
     $('#report').replaceChildren(
@@ -692,6 +743,7 @@
           voiceAnswers ? statTile('습관어', `${summary.totalHabits}회`, '약간, 뭔가 등', 't-orange') : '',
           voiceAnswers ? statTile('긴 끊김', `${summary.totalLongPauses}회`, '2.5초 이상', 't-red') : '')),
       h('div', { class: 'card' }, h('h2', {}, '📊 항목별 평균'), scoreBars(summary.avg)),
+      flyReport(),
       aiBox || '',
       h('div', { class: 'card' },
         h('h2', {}, '📝 질문별 다시보기'),
@@ -706,6 +758,26 @@
             deliveryTiles(r.analysis),
             feedbackLists(r.evaluation)))),
     );
+  }
+
+  /** 성적표의 초파리 뇌 요약: 답변 유형, 반복 답변, AI 선생님과 얼마나 비슷하게 채점했는지 */
+  function flyReport() {
+    const rs = state.results.filter((r) => r.evaluation.fly);
+    if (!rs.length) return '';
+    const types = {};
+    rs.forEach((r) => (types[r.evaluation.fly.typeLabel] = (types[r.evaluation.fly.typeLabel] || 0) + 1));
+    const repeats = rs.filter((r) => r.evaluation.fly.similar).length;
+    const taught = rs.filter((r) => r.evaluation.teacherOverall != null);
+    const gap = taught.length ? Math.round(taught.reduce((sum, r) => sum + Math.abs(r.evaluation.overall - r.evaluation.teacherOverall), 0) / taught.length) : null;
+    const st = FlyBrain.stats();
+    return h('div', { class: 'card' },
+      h('h2', {}, '🪰 초파리 뇌 리포트'),
+      h('div', { class: 'stat-tiles' },
+        statTile('가장 많은 유형', Object.entries(types).sort((a, b) => b[1] - a[1])[0][0], Object.entries(types).map(([t, n]) => `${t} ${n}`).join(' · '), 't-blue'),
+        statTile('반복 답변', `${repeats}회`, '예전 답과 단어 지문이 겹친 답', repeats ? 't-orange' : 't-green'),
+        gap != null ? statTile('AI 선생님과 차이', `±${gap}점`, '같은 답을 두고 매긴 종합 점수 차', gap <= 10 ? 't-green' : 't-orange') : '',
+        statTile('지금까지 배운 횟수', `${st.lessons}회`, `케년세포 ${st.kc.toLocaleString()}개 · 입력 ${st.pn}개`, 't-blue')),
+      h('p', { class: 'hint' }, '점수는 초파리 버섯체(mushroom body)를 본뜬 모델이 매겼어요. 답변을 2,000개 케년세포 중 100개만 켜지는 지문으로 바꾸고, 출력뉴런이 그 지문을 보고 좋음·나쁨을 판단해요.'));
   }
 
   function confetti() {
@@ -731,7 +803,8 @@
       L.push('', '말하기 습관:', ai.delivery_comment, '', '연습 계획:', ...ai.practice_plan.map((t, i) => `${i + 1}. ${t}`), '');
     }
     state.results.forEach((r, i) => {
-      L.push('----------------------------------------', `Q${i + 1}. ${r.question}`, `A. ${r.transcript || '(무응답)'}`, `점수 ${r.evaluation.overall}점`);
+      L.push('----------------------------------------', `Q${i + 1}. ${r.question}`, `A. ${r.transcript || '(무응답)'}`,
+        `점수 ${r.evaluation.overall}점 (초파리 뇌)${r.evaluation.teacherOverall != null ? ` · AI 선생님 ${r.evaluation.teacherOverall}점` : ''}${r.evaluation.fly ? ` · 유형 ${r.evaluation.fly.typeLabel}` : ''}`);
       r.evaluation.feedback_good.forEach((t) => L.push(`+ ${t}`));
       r.evaluation.feedback_improve.forEach((t) => L.push(`! ${t}`));
       if (r.evaluation.better_answer) L.push(`→ ${r.evaluation.better_answer}`);
@@ -768,6 +841,7 @@
     });
     $('#home').addEventListener('click', () => {
       renderHistory();
+      renderFlyStats();
       show('setup');
     });
     $('#download').addEventListener('click', download);
@@ -794,7 +868,22 @@
     setInterval(ping, 10000);
   }
 
+  function renderFlyStats() {
+    const st = FlyBrain.stats();
+    $('#fly-stats').textContent = st.lessons
+      ? `지금까지 ${st.lessons}번 배웠고, 답변 ${st.memories}개를 기억하고 있어요.`
+      : '예시 답변 36개로 기본기를 익혔어요. 연습할수록 더 배워요.';
+  }
+
+  FlyBrain.init();
   initSetup();
   bind();
+  renderFlyStats();
+  $('#fly-reset').addEventListener('click', () => {
+    if (!confirm('초파리 뇌가 배운 것과 기억한 답변을 모두 지우고 처음 상태로 돌릴까요?')) return;
+    FlyBrain.reset();
+    renderFlyStats();
+    toast('🪰 초파리 뇌를 처음 상태로 돌렸어요.');
+  });
   pingLauncher();
 })();

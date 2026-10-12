@@ -39,6 +39,28 @@
         <ol class="stamps" id="stamps"></ol>
       </section>
 
+      <section class="fly-card" aria-label="초파리 뇌">
+        <div class="fly-head">
+          <span class="fly-ico" aria-hidden="true">🪰</span>
+          <div>
+            <h2>말랑이의 초파리 뇌</h2>
+            <p class="hint" id="fly-stats">초파리 버섯체를 본뜬 모델이 답변을 인식하고 채점해요.</p>
+          </div>
+        </div>
+        <details class="fly-about">
+          <summary>초파리 뇌가 어떻게 채점하나요?</summary>
+          <ol>
+            <li><b>투사뉴런 50개</b>: 답변에서 말 속도·군말·결론 먼저·숫자·경험·상투어 같은 특징을 재서 입력으로 넣어요. (초파리 코의 냄새 신호 자리)</li>
+            <li><b>케년세포 2,000개</b>: 세포마다 입력 7개에 무작위로 연결돼 있어요. 실제 초파리와 같은 배선 방식이에요.</li>
+            <li><b>APL 억제</b>: 가장 강하게 반응한 5%(100개)만 남기고 나머지는 꺼요. 그래서 답변마다 고유한 '냄새 지문'이 생겨요.</li>
+            <li><b>출력뉴런 + 도파민</b>: 평가 항목마다 '좋음·나쁨' 출력뉴런이 지문을 보고 점수를 내요. AI 선생님 점수나 내 피드백이 도파민처럼 켜진 연결만 고쳐서, 쓸수록 똑똑해져요.</li>
+            <li><b>반복 답변 찾기</b>: 단어 냄새만 맡는 두 번째 회로(FlyHash)로 예전에 한 답과 겹치는지 알아봐요.</li>
+          </ol>
+          <p class="hint">참고: Dasgupta et al. (2017) Science · Aso et al. (2014) eLife · Hige et al. (2015) Neuron · Shen, Dasgupta &amp; Navlakha (2023) PNAS</p>
+          <button type="button" id="fly-reset" class="link">초파리 뇌 초기화 (배운 것 지우기)</button>
+        </details>
+      </section>
+
       <div id="support-warning" class="notice warn" hidden></div>
 
       <form id="setup-form" autocomplete="off">
@@ -229,6 +251,9 @@
   <script src="js/metrics.js"></script>
   <script src="js/speech.js"></script>
   <script src="js/ai.js"></script>
+  <script src="js/flycorpus.js"></script>
+  <script src="js/flybrain.js"></script>
+  <script src="js/flyview.js"></script>
   <script src="js/mascot.js"></script>
   <script src="js/app.js"></script>
 </body>

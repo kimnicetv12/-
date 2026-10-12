@@ -207,6 +207,24 @@ a { color: var(--berry-ink); font-weight: 700; text-decoration: none; }
 }
 .slot small { color: var(--ink-2); font-weight: 700; font-size: 0.8rem; }
 
+/* ---------- 초파리 뇌 ---------- */
+.fly-card { background: var(--surface); border-radius: 28px; padding: 16px 18px; margin-bottom: 18px; box-shadow: var(--shadow); }
+.fly-head { display: flex; align-items: center; gap: 12px; }
+.fly-head h2 { margin: 0; font-size: 1.15rem; }
+.fly-head .hint { margin: 2px 0 0; }
+.fly-ico { width: 46px; height: 46px; flex: none; display: grid; place-items: center; font-size: 1.6rem; border-radius: 50%; background: var(--blueberry-soft); }
+.fly-about { margin-top: 10px; }
+.fly-about summary { cursor: pointer; font-weight: 700; color: var(--blueberry-ink); }
+.fly-about ol { padding-left: 1.3em; margin: 10px 0 6px; display: grid; gap: 6px; font-size: 0.92rem; }
+.panel.fly h3 { margin-top: 0; }
+.fly-canvas { width: 100%; display: block; }
+.fly-notes { list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 4px; font-size: 0.9rem; color: var(--ink-2); }
+.fly-notes li::before { content: "· "; }
+.fly-notes b { color: var(--ink); }
+.fly-notes .warn { color: var(--pumpkin-ink); font-weight: 700; }
+.fly-teach { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 10px; font-size: 0.9rem; font-weight: 700; color: var(--ink-2); }
+.fly-teach span { margin-right: 4px; }
+
 /* ---------- 설정 단계 ---------- */
 .step {
   background: var(--surface); border-radius: 28px; padding: 20px; margin-bottom: 16px; box-shadow: var(--shadow);
