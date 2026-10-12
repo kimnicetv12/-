@@ -2,9 +2,9 @@
 (function () {
   const $ = (sel) => document.querySelector(sel);
   const STORE = {
-    key: 'aiInterview.apiKey',
-    settings: 'aiInterview.settings',
-    history: 'aiInterview.history',
+    keys: 'malang.keys',
+    settings: 'malang.settings',
+    history: 'malang.history',
   };
   const SCORE_LABELS = {
     content: '질문 적합성',
@@ -76,35 +76,50 @@
     return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
   }
 
+  function mascot(state, opts) {
+    return Mascot.mount(h('div'), { state, ...opts });
+  }
+
   /* ---------- 설정 화면 ---------- */
   function initSetup() {
-    const select = $('#field-select');
-    for (const [value, f] of Object.entries(Questions.FIELDS)) select.append(h('option', { value }, f.label));
+    Mascot.mount($('#brand-mascot'), { state: 'idle' });
+    Mascot.mount($('#hello-mascot'), { state: 'idle' });
+
+    const tiles = $('#field-tiles');
+    Object.entries(Questions.FIELDS).forEach(([value, f], i) => {
+      tiles.append(h('label', { class: 'pick' },
+        h('input', { type: 'radio', name: 'field', value, checked: i === 0 }),
+        h('span', {}, h('i', {}, f.icon), f.label)));
+    });
 
     const form = $('#setup-form');
     const saved = store(STORE.settings);
     if (saved) {
       for (const [k, v] of Object.entries(saved)) {
         const el = form.elements[k];
-        if (!el) continue;
+        if (!el || k === 'model') continue;
         if (el.type === 'checkbox') el.checked = !!v;
         else el.value = v;
       }
     }
-    const key = store(STORE.key);
-    if (key) {
-      $('#api-key').value = key;
-      $('#remember-key').checked = true;
-    }
-    updateApiStatus();
-    $('#api-key').addEventListener('input', updateApiStatus);
+    const keys = store(STORE.keys) || {};
+    $('#remember-key').checked = Object.keys(keys).length > 0;
+    syncProvider(saved && saved.model);
+
+    form.elements.provider.forEach((r) => r.addEventListener('change', () => syncProvider()));
+    $('#api-key').addEventListener('input', () => setApiStatus($('#api-key').value.trim() ? '확인 전' : '미연결', ''));
+    $('#check-key').addEventListener('click', checkKey);
+    form.elements.persona.forEach((r) => r.addEventListener('change', () => {
+      $('#hello-mascot').classList.toggle('with-glasses', r.value === 'strict' && r.checked);
+    }));
+    $('#hello-mascot').classList.toggle('with-glasses', form.elements.persona.value === 'strict');
 
     if (!Speech.Recognizer.supported) {
       const w = $('#support-warning');
       w.hidden = false;
-      w.textContent = '이 브라우저는 음성 인식을 지원하지 않습니다. 크롬(Chrome)이나 엣지(Edge)로 열면 말로 답변할 수 있어요. 지금은 타이핑 모드로만 진행됩니다.';
-      $('#input-mode').value = 'text';
-      $('#input-mode').querySelector('option[value="voice"]').disabled = true;
+      w.textContent = '이 브라우저는 음성 인식을 지원하지 않아요. 크롬(Chrome)이나 엣지(Edge)로 열면 말로 답변할 수 있어요. 지금은 타이핑으로만 진행돼요.';
+      form.elements.inputMode.value = 'text';
+      form.querySelector('input[name="inputMode"][value="voice"]').disabled = true;
       $('#mic-test').disabled = true;
     }
 
@@ -114,17 +129,61 @@
     });
     $('#mic-test').addEventListener('click', toggleMicTest);
     $('#clear-history').addEventListener('click', () => {
+      if (!confirm('연습 기록을 모두 지울까요?')) return;
       store(STORE.history, null);
       renderHistory();
     });
     renderHistory();
   }
 
-  function updateApiStatus() {
-    const has = $('#api-key').value.trim().startsWith('sk-');
+  function provider() {
+    return $('#setup-form').elements.provider.value;
+  }
+
+  function syncProvider(preferredModel) {
+    const p = AI.PROVIDERS[provider()];
+    const keys = store(STORE.keys) || {};
+    $('#api-key').value = keys[provider()] || '';
+    $('#api-key').placeholder = p.keyHint;
+    $('#key-link').href = p.keyUrl;
+    $('#key-link').textContent = provider() === 'gemini' ? '무료 키 받기 →' : '키 받기 →';
+    $('#model-row').hidden = provider() !== 'gemini';
+    fillModels(p.fallbackModels, preferredModel || p.defaultModel);
+    setApiStatus($('#api-key').value ? '확인 전' : '미연결', '');
+  }
+
+  function fillModels(models, selected) {
+    const sel = $('#model-select');
+    const list = [...new Set([selected, ...models].filter(Boolean))];
+    sel.replaceChildren(...list.map((m) => h('option', { value: m, selected: m === selected }, m)));
+  }
+
+  function setApiStatus(text, kind) {
     const s = $('#api-status');
-    s.textContent = has ? '연결됨: AI 면접관 + 꼬리질문 + 내용 채점' : '미연결: 기본 질문 + 간이 채점';
-    s.className = has ? 'api-ok' : '';
+    s.textContent = text;
+    s.className = `api-status ${kind || ''}`;
+  }
+
+  async function checkKey() {
+    const key = $('#api-key').value.trim();
+    const p = AI.PROVIDERS[provider()];
+    if (!key) return setApiStatus('키를 입력해 주세요', 'bad');
+    if (!p.keyPattern.test(key)) return setApiStatus(`키 모양이 이상해요 (${p.keyHint} 형태)`, 'bad');
+    if (provider() !== 'gemini') return setApiStatus('형식 확인됨 ✓ (실제 연결은 면접 중 확인)', 'ok');
+    setApiStatus('확인 중…', '');
+    $('#check-key').disabled = true;
+    try {
+      const models = await AI.listGeminiModels(key);
+      const current = $('#model-select').value;
+      const preferred = p.fallbackModels.filter((m) => models.includes(m));
+      const pick = models.includes(current) ? current : preferred[0] || models[0];
+      fillModels([...preferred, ...models], pick);
+      setApiStatus(`연결됨 ✓ 사용 가능한 모델 ${models.length}개`, 'ok');
+    } catch (e) {
+      setApiStatus(e.message, 'bad');
+    } finally {
+      $('#check-key').disabled = false;
+    }
   }
 
   function readSettings() {
@@ -143,12 +202,16 @@
       followUps: f.followUps.checked,
       autoStart: f.autoStart.checked,
       resume: f.resume.value.trim(),
+      provider: f.provider.value,
+      model: f.model.value,
     };
     const apiKey = f.apiKey.value.trim();
-    if (f.rememberKey.checked && apiKey) store(STORE.key, apiKey);
-    else store(STORE.key, null);
+    const keys = store(STORE.keys) || {};
+    if (f.rememberKey.checked && apiKey) keys[settings.provider] = apiKey;
+    else delete keys[settings.provider];
+    store(STORE.keys, Object.keys(keys).length ? keys : null);
     store(STORE.settings, { ...settings, fieldLabel: undefined });
-    return { ...settings, apiKey };
+    return { ...settings, ai: apiKey ? { provider: settings.provider, apiKey, model: settings.model } : null };
   }
 
   let testRec = null;
@@ -160,17 +223,23 @@
       testRec.abort();
       testMeter.stop();
       testRec = testMeter = null;
-      btn.textContent = '마이크 테스트';
+      btn.textContent = '🎤 마이크 테스트';
       box.hidden = true;
+      Mascot.setState($('#hello-mascot'), 'idle');
       return;
     }
     box.hidden = false;
+    box.scrollIntoView({ behavior: 'smooth', block: 'center' });
     btn.textContent = '테스트 끝내기';
+    Mascot.setState($('#hello-mascot'), 'listening');
     testMeter = new Speech.MicMeter();
     try {
-      await testMeter.start((lv) => ($('#test-meter').style.width = `${lv * 100}%`));
+      await testMeter.start((lv) => {
+        $('#test-meter').style.width = `${lv * 100}%`;
+        Mascot.setLevel($('#hello-mascot'), lv);
+      });
     } catch (e) {
-      toast('마이크를 켤 수 없습니다. 브라우저의 마이크 권한을 확인해 주세요.');
+      toast('마이크를 켤 수 없어요. 브라우저의 마이크 권한을 확인해 주세요.');
     }
     testRec = new Speech.Recognizer({
       onUpdate: (text) => ($('#mic-test-text').textContent = text),
@@ -179,19 +248,39 @@
     testRec.start();
   }
 
+  /** 하루라도 연습한 날이 이어진 횟수 */
+  function streakDays(list) {
+    const days = new Set(list.map((r) => new Date(r.date).toDateString()));
+    let n = 0;
+    const d = new Date();
+    if (!days.has(d.toDateString())) d.setDate(d.getDate() - 1); // 오늘 안 했어도 어제까지 이어졌으면 유지
+    while (days.has(d.toDateString())) {
+      n += 1;
+      d.setDate(d.getDate() - 1);
+    }
+    return n;
+  }
+
   function renderHistory() {
     const list = store(STORE.history) || [];
+    $('#streak').textContent = `🔥 ${streakDays(list)}`;
+    $('#best').textContent = `⭐ ${list.length ? Math.max(...list.map((r) => r.overall)) : '-'}`;
     $('#history-card').hidden = !list.length;
-    const body = $('#history-body');
-    body.replaceChildren(
-      ...list.slice(0, 15).map((r) =>
-        h('tr', {},
-          h('td', {}, new Date(r.date).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })),
-          h('td', {}, r.field),
-          h('td', {}, Claude.MODE_LABELS[r.mode] || r.mode),
-          h('td', {}, `${r.count}개`),
-          h('td', {}, `${r.overall}점`))),
+    $('#history-list').replaceChildren(
+      ...list.slice(0, 10).map((r) =>
+        h('li', {},
+          h('span', {},
+            h('b', {}, `${AI.MODE_LABELS[r.mode] || r.mode}`), ` · ${r.field} · ${r.count}문항`,
+            h('br'),
+            h('small', { class: 'hint' }, new Date(r.date).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }))),
+          h('span', { class: 'score' }, `${r.overall}점`))),
     );
+    if (list.length) {
+      const last = list[0];
+      $('#hello-text').replaceChildren(
+        '다시 왔군요! 지난번엔 ', h('b', {}, `${last.overall}점`), '이었어요.', h('br'),
+        '오늘은 그보다 더 잘할 수 있을 거예요!');
+    }
   }
 
   /* ---------- 면접 진행 ---------- */
@@ -203,44 +292,58 @@
     state.results = [];
     state.report = null;
 
-    $('#mode-label').textContent = `${Claude.MODE_LABELS[settings.mode]} · ${settings.company || settings.fieldLabel}`;
-    $('#engine-label').textContent = settings.apiKey ? 'AI 면접관 (Claude)' : '기본 모드 (간이 채점)';
+    Mascot.mount($('#interviewer'), { state: 'idle', glasses: settings.persona === 'strict' });
+    $('#mode-label').textContent = `${AI.MODE_LABELS[settings.mode]} · ${settings.company || settings.fieldLabel}`;
+    $('#engine-label').textContent = settings.ai ? `${settings.ai.provider === 'gemini' ? '✨ Gemini' : '🧠 Claude'} 면접관` : '기본 모드 (간이 채점)';
     $('#time-limit-label').textContent = `/ ${fmtTime(settings.timeLimit)}`;
-    $('#live-meter-wrap').hidden = settings.inputMode !== 'voice';
     $('#key-hint').hidden = settings.inputMode !== 'voice';
 
     if (settings.inputMode === 'voice') {
       state.recognizer = new Speech.Recognizer({ onUpdate: renderLive, onError: (m) => toast(m, 6000) });
       state.meter = new Speech.MicMeter();
-      state.meter.start((lv) => ($('#live-meter').style.width = `${lv * 100}%`)).catch(() => {
-        toast('마이크를 켤 수 없습니다. 브라우저의 마이크 권한을 확인해 주세요.', 6000);
-      });
+      state.meter.start((lv) => {
+        if (state.phase !== 'recording') return;
+        Mascot.setLevel($('#interviewer'), lv);
+        $('#btn-stop').style.setProperty('--level', lv.toFixed(3));
+      }).catch(() => toast('마이크를 켤 수 없어요. 브라우저의 마이크 권한을 확인해 주세요.', 6000));
     }
     show('interview');
     askQuestion({ question: Questions.OPENER, followUp: false });
+  }
+
+  function updateProgress() {
+    const pct = Math.round((state.results.length / state.settings.count) * 100);
+    $('#progress-fill').style.width = `${pct}%`;
+    $('#progress').setAttribute('aria-valuenow', pct);
+    $('#progress-label').textContent = `${Math.min(state.results.length + 1, state.settings.count)}/${state.settings.count}`;
   }
 
   async function askQuestion({ question, followUp, reaction }) {
     state.current = { question, followUp };
     state.asked.push(question);
     state.raw = null;
-    $('#progress-label').textContent = `질문 ${state.results.length + 1} / ${state.settings.count}`;
+    updateProgress();
     $('#question-text').textContent = question;
     $('#followup-tag').hidden = !followUp;
     $('#reaction').hidden = !reaction;
     $('#reaction').textContent = reaction || '';
-    $('#feedback').hidden = true;
-    $('#evaluating').hidden = true;
+    $('#sheet').hidden = true;
+    $('#answer-foot').hidden = true;
     $('#live-transcript').replaceChildren();
     $('#live-transcript').hidden = false;
     $('#answer-edit').hidden = true;
     $('#answer-edit').value = '';
     $('#edit-hint').hidden = true;
     resetTimer();
-    setButtons([]);
+    setMic([]);
 
-    if (state.settings.tts) await Speech.speak(reaction ? `${reaction} ${question}` : question);
+    const face = $('#interviewer');
+    if (state.settings.tts) {
+      Mascot.setState(face, 'talking');
+      await Speech.speak(reaction ? `${reaction} ${question}` : question);
+    }
     if (state.current.question !== question) return; // 읽는 도중 면접 종료 등
+    Mascot.setState(face, 'idle');
 
     if (state.settings.inputMode === 'text') {
       state.phase = 'recording';
@@ -249,17 +352,22 @@
       $('#answer-edit').placeholder = '답변을 입력하세요.';
       $('#answer-edit').focus();
       startTimer();
-      setButtons(['submit']);
+      showFoot({ retry: false });
     } else {
       state.phase = 'ready';
-      setButtons(['start']);
+      setMic(['start']);
       if (state.settings.autoStart) startAnswer();
     }
   }
 
-  function setButtons(visible) {
-    const map = { start: '#btn-start', stop: '#btn-stop', retry: '#btn-retry', submit: '#btn-submit' };
-    for (const [k, sel] of Object.entries(map)) $(sel).hidden = !visible.includes(k);
+  function setMic(visible) {
+    $('#btn-start').hidden = !visible.includes('start');
+    $('#btn-stop').hidden = !visible.includes('stop');
+  }
+
+  function showFoot({ retry }) {
+    $('#answer-foot').hidden = false;
+    $('#btn-retry').hidden = !retry;
   }
 
   function renderLive(text) {
@@ -286,11 +394,11 @@
       $('#timebar-fill').classList.toggle('over', sec > limit * 0.85);
       if (sec >= limit && state.phase === 'recording') {
         if (state.settings.inputMode === 'voice') {
-          toast('답변 시간이 끝났습니다.');
+          toast('⏰ 답변 시간이 끝났어요!');
           stopAnswer();
         } else {
           clearInterval(state.timer);
-          toast('제한 시간이 지났습니다. 마무리해서 제출하세요.');
+          toast('⏰ 제한 시간이 지났어요. 마무리해서 제출하세요.');
         }
       }
     }, 200);
@@ -301,34 +409,38 @@
     Speech.stopSpeaking();
     state.phase = 'recording';
     $('#live-transcript').replaceChildren();
+    Mascot.setState($('#interviewer'), 'listening');
     state.recognizer.start();
     startTimer();
-    setButtons(['stop']);
+    setMic(['stop']);
   }
 
   async function stopAnswer() {
     if (state.phase !== 'recording') return;
     state.phase = 'review';
     clearInterval(state.timer);
-    setButtons([]);
+    setMic([]);
+    Mascot.setLevel($('#interviewer'), 0);
+    Mascot.setState($('#interviewer'), 'idle');
     state.raw = await state.recognizer.stop();
     const edit = $('#answer-edit');
     edit.value = state.raw.transcript;
-    edit.placeholder = '인식된 말이 없습니다. 다시 답변하거나 직접 입력하세요.';
+    edit.placeholder = '인식된 말이 없어요. 다시 답변하거나 직접 입력하세요.';
     edit.hidden = false;
     $('#live-transcript').hidden = true;
     $('#edit-hint').hidden = false;
-    setButtons(['retry', 'submit']);
+    showFoot({ retry: true });
   }
 
   function retryAnswer() {
     $('#answer-edit').hidden = true;
     $('#edit-hint').hidden = true;
+    $('#answer-foot').hidden = true;
     $('#live-transcript').hidden = false;
     $('#live-transcript').replaceChildren();
     resetTimer();
     state.phase = 'ready';
-    setButtons(['start']);
+    setMic(['start']);
   }
 
   async function submitAnswer() {
@@ -343,16 +455,19 @@
     analysis.textMode = textMode;
 
     state.phase = 'evaluating';
-    setButtons([]);
-    $('#evaluating').hidden = false;
+    $('#answer-foot').hidden = true;
+    const face = $('#interviewer');
+    Mascot.setState(face, 'thinking');
+    $('#reaction').hidden = false;
+    $('#reaction').textContent = '음… 답변을 곰곰이 생각하는 중이에요';
 
     const { question, followUp } = state.current;
     const remaining = state.settings.count - (state.results.length + 1);
     let evaluation;
-    if (state.settings.apiKey) {
+    if (state.settings.ai) {
       try {
-        evaluation = await Claude.evaluateAnswer({
-          apiKey: state.settings.apiKey,
+        evaluation = await AI.evaluateAnswer({
+          ai: state.settings.ai,
           settings: state.settings,
           history: state.results.map((r) => ({ question: r.question, transcript: r.transcript })),
           question,
@@ -363,51 +478,64 @@
         if (textMode) evaluation.scores.delivery = null;
         evaluation.overall = Metrics.overallFromScores(evaluation.scores);
       } catch (e) {
-        toast(`AI 채점 실패: ${e.message} 이번 답변은 간이 채점으로 대신합니다.`, 6000);
+        toast(`AI 채점 실패: ${e.message} 이번 답변은 간이 채점으로 대신할게요.`, 7000);
       }
     }
     if (!evaluation) evaluation = Metrics.ruleBasedEvaluation({ question, analysis, timeLimitSec: state.settings.timeLimit });
     if (state.phase !== 'evaluating') return; // 채점 중 면접 종료
 
     state.results.push({ question, followUp, transcript, analysis, evaluation });
-    $('#evaluating').hidden = true;
+    updateProgress();
+    $('#reaction').hidden = true;
 
     const next = remaining > 0 ? nextQuestion(evaluation, remaining) : null;
+    const reaction = evaluation.source === 'ai' ? evaluation.interviewer_reaction : '';
     if (state.settings.feedbackTiming === 'each') {
       state.phase = 'feedback';
-      renderFeedback(evaluation, analysis, next);
+      Mascot.setState(face, moodFor(evaluation.overall));
+      renderSheet(evaluation, analysis, next, reaction);
     } else if (next) {
-      askQuestion({ ...next, reaction: evaluation.source === 'claude' ? evaluation.interviewer_reaction : '' });
+      askQuestion({ ...next, reaction });
     } else {
       finish();
     }
   }
 
+  function moodFor(score) {
+    return score >= 75 ? 'happy' : score >= 55 ? 'cheer' : 'sad';
+  }
+
   function nextQuestion(evaluation, remaining) {
-    if (evaluation.next_question && evaluation.next_question.trim()) {
-      return { question: evaluation.next_question.trim(), followUp: !!evaluation.next_is_follow_up };
+    if (evaluation.next_question) {
+      return { question: evaluation.next_question, followUp: !!evaluation.next_is_follow_up };
     }
     if (remaining === 1) return { question: Questions.CLOSER, followUp: false };
     const pick = state.bank.slice(1, -1).find((q) => !state.asked.includes(q));
     return { question: pick || Questions.CLOSER, followUp: false };
   }
 
-  function renderFeedback(ev, analysis, next) {
-    const box = $('#feedback');
-    box.replaceChildren(
-      h('h2', {}, `이번 답변 ${ev.overall}점`, ev.source === 'rule' ? h('span', { class: 'muted' }, '  (간이 채점)') : ''),
-      scoreBars(ev.scores),
-      deliveryTiles(analysis),
-      feedbackLists(ev),
+  function renderSheet(ev, analysis, next, reaction) {
+    const tier = ev.overall >= 75 ? 'good' : ev.overall >= 55 ? 'okay' : 'low';
+    const title = { good: '훌륭해요! 🎉', okay: '좋아요, 조금만 더!', low: '괜찮아요, 다시 해봐요!' }[tier];
+    const sheet = $('#sheet');
+    sheet.className = `sheet ${tier}`;
+    $('#sheet-body').replaceChildren(
+      h('div', { class: 'sheet-head' },
+        mascot(moodFor(ev.overall), { glasses: state.settings.persona === 'strict' }),
+        h('div', {},
+          h('p', { class: 'sheet-title' }, title),
+          h('p', { class: 'sheet-sub' }, `이번 답변 ${ev.overall}점${ev.source === 'rule' ? ' · 간이 채점' : ''}`))),
+      h('div', { class: 'panel' }, scoreBars(ev.scores), deliveryTiles(analysis)),
+      h('div', { class: 'panel' }, feedbackLists(ev)),
       h('div', { class: 'actions' },
         h('button', {
           type: 'button',
-          class: 'primary',
-          onclick: () => (next ? askQuestion({ ...next, reaction: ev.source === 'claude' ? ev.interviewer_reaction : '' }) : finish()),
-        }, next ? '다음 질문' : '결과 보기')),
+          class: 'btn btn-wide',
+          onclick: () => (next ? askQuestion({ ...next, reaction }) : finish()),
+        }, next ? '계속하기' : '결과 보기')),
     );
-    box.hidden = false;
-    box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    sheet.hidden = false;
+    sheet.scrollTop = 0;
   }
 
   function scoreBars(scores) {
@@ -423,31 +551,36 @@
   }
 
   function deliveryTiles(a) {
-    if (a.textMode) return h('p', { class: 'hint' }, '타이핑 답변이라 말하기 지표는 측정하지 않았습니다.');
+    if (a.textMode) return h('p', { class: 'hint' }, '⌨️ 타이핑 답변이라 말하기 지표는 측정하지 않았어요.');
     const fillerDetail = Object.entries(a.fillers).map(([w, n]) => `${w} ${n}`).join(', ');
-    return h('div', { class: 'tiles', style: 'margin-top:16px' },
-      tile('말 속도', a.rate ? `${a.rate}` : '—', a.rate ? `음절/분 · ${a.rateVerdict}` : '인식된 말 없음'),
-      tile('군말', `${a.fillerCount}회`, fillerDetail || '음/어 등'),
-      tile('긴 끊김', `${a.longPauses}회`, a.longestPauseSec ? `최장 ${a.longestPauseSec}초` : '2.5초 이상'),
-      tile('첫 마디까지', a.firstSpeechSec == null ? '—' : `${a.firstSpeechSec}초`, `답변 ${a.durationSec}초`));
+    const rateColor = a.rateVerdict === '적절' ? 't-green' : a.rate ? 't-orange' : '';
+    return h('div', { class: 'stat-tiles' },
+      statTile('말 속도', a.rate ? `${a.rate}` : '—', a.rate ? `음절/분 · ${a.rateVerdict}` : '인식된 말 없음', rateColor || 't-blue'),
+      statTile('군말', `${a.fillerCount}회`, fillerDetail || '음/어 등', a.fillerPerMin > 2 ? 't-orange' : 't-green'),
+      statTile('긴 끊김', `${a.longPauses}회`, a.longestPauseSec ? `최장 ${a.longestPauseSec}초` : '2.5초 이상', a.longPauses >= 2 ? 't-orange' : 't-green'),
+      statTile('첫 마디', a.firstSpeechSec == null ? '—' : `${a.firstSpeechSec}초`, `답변 ${a.durationSec}초`, 't-blue'));
   }
 
-  function tile(label, value, sub) {
-    return h('div', { class: 'tile' }, h('div', { class: 'label' }, label), h('div', { class: 'value' }, value), h('div', { class: 'sub' }, sub));
+  function statTile(label, value, sub, cls) {
+    return h('div', { class: `stat-tile ${cls || ''}` },
+      h('div', { class: 'label' }, label), h('div', { class: 'value' }, value), h('div', { class: 'sub' }, sub));
   }
 
   function feedbackLists(ev) {
     return h('div', {},
       ev.feedback_good.length ? [h('h3', {}, '잘한 점'), h('ul', { class: 'good' }, ev.feedback_good.map((t) => h('li', {}, t)))] : '',
       ev.feedback_improve.length ? [h('h3', {}, '고칠 점'), h('ul', { class: 'improve' }, ev.feedback_improve.map((t) => h('li', {}, t)))] : '',
-      ev.better_answer ? [h('h3', {}, ev.source === 'claude' ? '이렇게 말해 보세요' : '답변 구성 팁'), h('p', { class: 'better' }, ev.better_answer)] : '');
+      ev.better_answer ? [h('h3', {}, ev.source === 'ai' ? '이렇게 말해 보세요' : '답변 구성 팁'), h('p', { class: 'better' }, ev.better_answer)] : '');
   }
 
   function quit() {
-    if (!confirm('면접을 종료할까요? 지금까지 답한 내용으로 결과를 보여 드립니다.')) return;
+    if (!confirm('면접을 그만할까요? 지금까지 답한 내용으로 결과를 보여 드릴게요.')) return;
     stopEverything();
     if (state.results.length) finish();
-    else show('setup');
+    else {
+      renderHistory();
+      show('setup');
+    }
   }
 
   function stopEverything() {
@@ -457,24 +590,29 @@
     Speech.stopSpeaking();
     if (state.recognizer) state.recognizer.abort();
     if (state.meter) state.meter.stop();
+    $('#sheet').hidden = true;
+    $('#answer-foot').hidden = true;
   }
 
   /* ---------- 결과 ---------- */
   async function finish() {
     stopEverything();
     const summary = Metrics.summarizeSession(state.results);
-    state.report = { summary, ai: null, date: new Date().toISOString() };
+    state.report = { summary, ai: null, aiPending: false, date: new Date().toISOString() };
     saveHistory(summary);
+    const wantAI = state.settings.ai && state.results.some((r) => r.evaluation.source === 'ai');
+    state.report.aiPending = !!wantAI;
     renderReport();
     show('report');
+    if (summary.overall >= 70) confetti();
 
-    if (state.settings.apiKey && state.results.some((r) => r.evaluation.source === 'claude')) {
-      $('#ai-report').replaceChildren(h('div', { class: 'spinner' }), h('p', { class: 'center muted' }, '면접관 총평을 작성하는 중…'));
+    if (wantAI) {
       try {
-        state.report.ai = await Claude.finalReport({ apiKey: state.settings.apiKey, settings: state.settings, results: state.results, summary });
+        state.report.ai = await AI.finalReport({ ai: state.settings.ai, settings: state.settings, results: state.results, summary });
       } catch (e) {
         toast(`총평 생성 실패: ${e.message}`, 6000);
       }
+      state.report.aiPending = false;
       renderReport();
     }
   }
@@ -492,63 +630,69 @@
   }
 
   function renderReport() {
-    const { summary, ai } = state.report;
+    const { summary, ai, aiPending } = state.report;
     const s = state.settings;
     const voiceAnswers = state.results.filter((r) => !r.analysis.textMode).length;
+    const grade = Metrics.gradeFor(summary.overall);
 
-    const aiBox = h('div', { id: 'ai-report' });
+    let aiBox;
     if (ai) {
-      aiBox.append(
-        h('h2', {}, '면접관 총평'),
+      aiBox = h('div', { class: 'card' },
+        h('h2', {}, '💬 말랑이의 총평'),
         h('p', {}, ai.overall_comment),
         h('h3', {}, '강점'), h('ul', { class: 'good' }, ai.strengths.map((t) => h('li', {}, t))),
         h('h3', {}, '보완점'), h('ul', { class: 'improve' }, ai.weaknesses.map((t) => h('li', {}, t))),
-        h('h3', {}, '말하기 습관'), h('p', {}, ai.delivery_comment),
-        h('h3', {}, '다음 연습 계획'), h('ol', {}, ai.practice_plan.map((t) => h('li', {}, t))),
-      );
-    } else if (!s.apiKey) {
-      aiBox.append(h('p', { class: 'hint' }, 'Claude API 키를 연결하면 답변 내용을 실제로 읽고 평가한 총평과 꼬리질문을 받을 수 있습니다. 지금 점수는 말하기 지표와 답변 형식 위주의 간이 채점입니다.'));
+        ai.delivery_comment ? [h('h3', {}, '말하기 습관'), h('p', {}, ai.delivery_comment)] : '',
+        h('h3', {}, '다음 연습 계획'), h('ol', {}, ai.practice_plan.map((t) => h('li', {}, t))));
+    } else if (aiPending) {
+      aiBox = h('div', { class: 'card ai-loading' }, mascot('thinking'), h('p', {}, '말랑이가 총평을 쓰는 중이에요…'));
+    } else if (!s.ai) {
+      aiBox = h('div', { class: 'card ai-loading' }, mascot('cheer'),
+        h('p', { class: 'hint' }, '무료 Gemini 키를 연결하면 말랑이가 답변 내용을 직접 읽고 총평과 꼬리질문을 해 줘요. 지금 점수는 말하기 습관과 답변 형식 위주의 간이 채점이에요.'));
     }
 
     $('#report').replaceChildren(
+      h('div', { class: 'result-hero' },
+        mascot(summary.overall >= 70 ? 'happy' : 'cheer', { glasses: s.persona === 'strict' }),
+        h('h1', {}, '면접 완료!'),
+        h('p', { class: 'grade-line' }, `${AI.MODE_LABELS[s.mode]} · ${s.company || s.fieldLabel} · ${state.results.length}문항`)),
+      h('div', { class: 'stat-tiles' },
+        statTile('총점', `${summary.overall}`, '100점 만점', 't-yellow'),
+        statTile('등급', grade, summary.overall >= 70 ? '이대로만 가요!' : '조금만 더!', summary.overall >= 70 ? 't-green' : 't-orange'),
+        voiceAnswers ? statTile('말 속도', summary.avgRate ? `${summary.avgRate}` : '—', `적정 ${Metrics.IDEAL_RATE.min}~${Metrics.IDEAL_RATE.max}`, 't-blue') : '',
+        voiceAnswers ? statTile('군말', `${summary.totalFillers}회`, `습관어 ${summary.totalHabits} · 끊김 ${summary.totalLongPauses}`, 't-red') : ''),
+      h('div', { class: 'card' }, h('h2', {}, '📊 항목별 평균'), scoreBars(summary.avg)),
+      aiBox || '',
       h('div', { class: 'card' },
-        h('h2', {}, '면접 결과'),
-        h('p', { class: 'muted' }, `${Claude.MODE_LABELS[s.mode]} · ${s.company || s.fieldLabel} · 질문 ${state.results.length}개`),
-        h('div', { class: 'hero' },
-          h('div', {},
-            h('div', { class: 'big' }, `${summary.overall}`, h('small', {}, ' / 100')),
-            h('div', { class: 'grade' }, Metrics.gradeFor(summary.overall))),
-          scoreBars(summary.avg)),
-        voiceAnswers
-          ? h('div', { class: 'tiles', style: 'margin-top:20px' },
-            tile('평균 말 속도', summary.avgRate ? `${summary.avgRate}` : '—', `음절/분 (적정 ${Metrics.IDEAL_RATE.min}~${Metrics.IDEAL_RATE.max})`),
-            tile('군말 합계', `${summary.totalFillers}회`, '음, 어 등'),
-            tile('습관어 합계', `${summary.totalHabits}회`, '약간, 뭔가, 그냥 등'),
-            tile('긴 끊김 합계', `${summary.totalLongPauses}회`, '2.5초 이상'))
-          : ''),
-      h('div', { class: 'card' }, aiBox),
-      h('div', { class: 'card' },
-        h('h2', {}, '질문별 상세'),
+        h('h2', {}, '📝 질문별 다시보기'),
         state.results.map((r, i) =>
           h('details', { class: 'qa', open: i === 0 },
             h('summary', {},
-              h('span', {}, `Q${i + 1}. ${r.followUp ? '[꼬리] ' : ''}${r.question}`),
+              h('span', {}, `Q${i + 1}. `, r.followUp ? h('span', { class: 'followup-mini' }, '[꼬리] ') : '', r.question),
               h('span', { class: 'pts' }, `${r.evaluation.overall}점`)),
             h('h3', {}, '내 답변'),
             h('p', { class: 'said' }, r.transcript || '(무응답)'),
-            scoreBars(r.evaluation.scores),
+            h('div', { style: 'margin-top:12px' }, scoreBars(r.evaluation.scores)),
             deliveryTiles(r.analysis),
-            feedbackLists(r.evaluation))),
-      ),
+            feedbackLists(r.evaluation)))),
     );
+  }
+
+  function confetti() {
+    const box = $('#confetti');
+    const colors = ['#58cc02', '#1cb0f6', '#ffc800', '#ff4b4b', '#ce82ff', '#ff9600'];
+    box.replaceChildren(...Array.from({ length: 60 }, (_, i) => h('i', {
+      style: `left:${Math.random() * 100}%;background:${colors[i % colors.length]};animation-duration:${1.8 + Math.random() * 1.6}s;animation-delay:${Math.random() * 0.5}s;transform:rotate(${Math.random() * 360}deg)`,
+    })));
+    setTimeout(() => box.replaceChildren(), 4500);
   }
 
   function reportText() {
     const { summary, ai } = state.report;
     const s = state.settings;
     const L = [];
-    L.push('AI 면접 훈련기 결과', `${new Date(state.report.date).toLocaleString('ko-KR')}`);
-    L.push(`${Claude.MODE_LABELS[s.mode]} / ${s.company || s.fieldLabel}`, '');
+    L.push('말랑 면접 결과', `${new Date(state.report.date).toLocaleString('ko-KR')}`);
+    L.push(`${AI.MODE_LABELS[s.mode]} / ${s.company || s.fieldLabel}`, '');
     L.push(`종합 ${summary.overall}점 (${Metrics.gradeFor(summary.overall)})`);
     for (const [k, name] of Object.entries(SCORE_LABELS)) L.push(`- ${name}: ${summary.avg[k] == null ? '측정 안 함' : `${summary.avg[k]}/10`}`);
     L.push(`평균 말 속도 ${summary.avgRate}음절/분, 군말 ${summary.totalFillers}회, 습관어 ${summary.totalHabits}회, 긴 끊김 ${summary.totalLongPauses}회`, '');
@@ -581,9 +725,11 @@
     $('#btn-stop').addEventListener('click', stopAnswer);
     $('#btn-retry').addEventListener('click', retryAnswer);
     $('#btn-submit').addEventListener('click', submitAnswer);
-    $('#replay').addEventListener('click', () => {
-      if (state.phase === 'recording') return;
-      Speech.speak(state.current.question);
+    $('#replay').addEventListener('click', async () => {
+      if (state.phase === 'recording' || !state.current.question) return;
+      Mascot.setState($('#interviewer'), 'talking');
+      await Speech.speak(state.current.question);
+      if (state.phase === 'ready') Mascot.setState($('#interviewer'), 'idle');
     });
     $('#quit').addEventListener('click', quit);
     $('#again').addEventListener('click', () => {
