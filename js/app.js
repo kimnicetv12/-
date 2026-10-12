@@ -786,6 +786,15 @@
     });
   }
 
+  /** exe 실행기로 열렸으면, 창이 열려 있다는 신호를 보내 실행기가 창 닫힘을 알 수 있게 한다. */
+  function pingLauncher() {
+    if (!new URLSearchParams(location.search).has('launcher')) return;
+    const ping = () => fetch('/__malang/ping', { cache: 'no-store' }).catch(() => {});
+    ping();
+    setInterval(ping, 10000);
+  }
+
   initSetup();
   bind();
+  pingLauncher();
 })();
