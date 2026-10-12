@@ -29,8 +29,10 @@ python3 -m http.server 8000      # 또는: npm start
 
 - **Google Gemini (무료)**: <https://aistudio.google.com/apikey> 에서 구글 계정으로 키(`AIza...`)를 무료로 발급받아
   설정 5번 "AI 면접관 연결"에 넣고 **연결 확인**을 누르세요. 키가 맞으면 쓸 수 있는 모델 목록이 채워집니다.
-  기본 모델은 `gemini-3.8-flash`이고, 모델이 없으면 `gemini-3.5-flash-lite` → `gemini-3.6-flash` → `gemini-2.5-flash` 순으로 자동 전환합니다.
-  무료 등급은 분당/일일 요청 수 제한이 있어서, 한도에 걸리면 잠시 기다렸다가 한 번 더 시도하고 그래도 안 되면 그 답변만 간이 채점으로 넘어갑니다.
+  키는 예전 형식(`AIza...`)과 새 형식(`AQ.`로 시작) 모두 됩니다.
+  기본 모델은 `gemini-3.8-flash`이고, 그 모델이 혼잡하거나(503) 무료 한도에 걸리거나(429) 없으면
+  `gemini-3.5-flash` → `gemini-3.6-flash` → `gemini-3.5-flash-lite` 순으로 자동 전환합니다.
+  모든 모델이 실패하면 잠시 기다렸다 한 번 더 시도하고, 그래도 안 되면 그 답변만 간이 채점으로 넘어갑니다.
 - **Claude**: <https://console.anthropic.com> 에서 키(`sk-ant-...`)를 발급받아 넣으면 됩니다(유료).
 
 키는 브라우저 안에만 있고 해당 AI 회사의 API로만 전송됩니다. ("이 브라우저에 키 저장"을 켜지 않으면 새로고침 시 사라집니다.)

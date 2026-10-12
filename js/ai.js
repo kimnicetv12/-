@@ -5,12 +5,13 @@
   const PROVIDERS = {
     gemini: {
       label: 'Google Gemini (무료 키 가능)',
-      keyHint: 'AIza...',
-      keyPattern: /^AIza[0-9A-Za-z_-]{20,}$/,
+      keyHint: 'AIza... 또는 AQ....',
+      // 예전 형식(AIza...)과 새 형식(AQ....) 모두 허용
+      keyPattern: /^(AIza[0-9A-Za-z_-]{20,}|AQ\.[0-9A-Za-z_.-]{20,})$/,
       keyUrl: 'https://aistudio.google.com/apikey',
       defaultModel: 'gemini-3.8-flash',
-      // 기본 모델이 없거나 막혔을 때 차례로 시도
-      fallbackModels: ['gemini-3.8-flash', 'gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-2.5-flash'],
+      // 기본 모델이 없거나, 혼잡하거나, 무료 한도에 걸리면 차례로 시도
+      fallbackModels: ['gemini-3.8-flash', 'gemini-3.5-flash', 'gemini-3.6-flash', 'gemini-3.5-flash-lite'],
     },
     claude: {
       label: 'Anthropic Claude',
@@ -56,7 +57,7 @@
       feedback_good: { type: 'array', items: { type: 'string' }, description: '잘한 점 1~3개, 각 한 문장' },
       feedback_improve: { type: 'array', items: { type: 'string' }, description: '고칠 점 1~4개, 구체적인 행동 지침으로' },
       better_answer: { type: 'string', description: '지원자 답변을 살린 개선 답변 예시(3~5문장, 지원자 1인칭)' },
-      interviewer_reaction: { type: 'string', description: '면접관이 실제로 소리 내어 할 짧은 반응 한 문장(평가 내용 누설 금지)' },
+      interviewer_reaction: { type: 'string', description: '다음 질문 직전에 면접관이 하는 짧은 맞장구 한마디(40자 이내, 예: "네, 잘 들었습니다."). 질문·평가·지적을 넣지 말 것' },
       next_question: { type: 'string', description: '다음에 던질 질문. 더 물을 질문이 없으면 빈 문자열' },
       next_is_follow_up: { type: 'boolean', description: '다음 질문이 방금 답변에 대한 꼬리질문이면 true' },
     },
@@ -121,6 +122,14 @@
 
   const strList = (v) => (Array.isArray(v) ? v : v ? [v] : []).map((x) => String(x).trim()).filter(Boolean);
 
+  /** 반응은 짧은 맞장구만 남긴다. 질문을 품고 있으면 다음 질문과 겹치므로 버린다. */
+  function cleanReaction(text) {
+    const t = String(text || '').trim();
+    if (!t || /[?？]/.test(t)) return '';
+    const first = t.split(/(?<=[.!。])\s+/)[0];
+    return first.length > 60 ? '' : first;
+  }
+
   /** 모델마다 들쭉날쭉한 출력을 화면이 기대하는 모양으로 맞춘다. */
   function normalizeEvaluation(raw) {
     const scores = {};
@@ -133,7 +142,7 @@
       feedback_good: strList(raw.feedback_good).slice(0, 3),
       feedback_improve: strList(raw.feedback_improve).slice(0, 4),
       better_answer: String(raw.better_answer || '').trim(),
-      interviewer_reaction: String(raw.interviewer_reaction || '').trim(),
+      interviewer_reaction: cleanReaction(raw.interviewer_reaction),
       next_question: String(raw.next_question || '').trim(),
       next_is_follow_up: raw.next_is_follow_up === true || raw.next_is_follow_up === 'true',
       source: 'ai',
@@ -191,8 +200,11 @@
       '[지금까지의 문답]', historyText(history), '',
       '[이번 질문]', question, '',
       '[지원자 답변(음성 인식)]', transcript || '(지원자가 아무 말도 하지 않았습니다)', '',
-      '[측정된 전달력 지표]', JSON.stringify(metrics), '',
+      ...(analysis.textMode
+        ? ['[전달력] 지원자가 타이핑으로 답했으므로 말하기 지표가 없습니다. 말 속도·군말·끊김·답변 시간에 대한 피드백은 쓰지 말고, delivery 점수는 5로 두세요.', '']
+        : ['[측정된 전달력 지표]', JSON.stringify(metrics), '']),
       `[다음 질문 지침] ${nextRule}`,
+      'interviewer_reaction은 "네, 알겠습니다."처럼 짧은 맞장구만 쓰고, 다음 질문 내용은 next_question에만 쓰세요.',
       '',
       '정해진 JSON 형식으로만 답하세요.',
     ].join('\n');
@@ -202,12 +214,16 @@
     const lines = results.map((r, i) => [
       `Q${i + 1}. ${r.question}`,
       `A${i + 1}. ${r.transcript || '(무응답)'}`,
-      `점수: ${JSON.stringify(r.evaluation.scores)} / 말 속도 ${r.analysis.rate}음절/분, 군말 ${r.analysis.fillerCount}회, 긴 끊김 ${r.analysis.longPauses}회`,
+      r.analysis.textMode
+        ? `점수: ${JSON.stringify(r.evaluation.scores)} / 타이핑 답변(말하기 지표 없음)`
+        : `점수: ${JSON.stringify(r.evaluation.scores)} / 말 속도 ${r.analysis.rate}음절/분, 군말 ${r.analysis.fillerCount}회, 긴 끊김 ${r.analysis.longPauses}회`,
     ].join('\n'));
+    const allTyped = results.every((r) => r.analysis.textMode);
     return [
       '면접이 끝났습니다. 전체 문답과 항목별 점수를 보고 총평을 작성하세요.', '',
       lines.join('\n\n'), '',
       `[평균 점수] ${JSON.stringify(summary.avg)} / 종합 ${summary.overall}점`, '',
+      allTyped ? '모든 답변이 타이핑이라 말하기 습관은 측정하지 않았습니다. delivery_comment에는 "타이핑 답변이라 말하기 습관은 평가하지 않았습니다."라고만 쓰세요.' : '',
       '정해진 JSON 형식으로만 답하세요.',
     ].join('\n');
   }
@@ -271,7 +287,8 @@
         return out;
       } catch (e) {
         lastErr = e;
-        if (!e.modelMissing) throw e;
+        // 모델이 없거나(404), 무료 한도(429, 모델별로 따로 셈)거나, 혼잡(5xx)하면 다음 모델로
+        if (!(e.modelMissing || e.status === 429 || e.status >= 500)) throw e;
       }
     }
     throw lastErr;
@@ -289,7 +306,7 @@
     return (data.models || [])
       .filter((m) => (m.supportedGenerationMethods || []).includes('generateContent'))
       .map((m) => m.name.replace(/^models\//, ''))
-      .filter((n) => /^gemini-/.test(n) && !/(tts|live|image|embedding|transcribe|robotics|audio|vision|aqa|computer)/i.test(n));
+      .filter((n) => /^gemini-/.test(n) && !/(tts|live|image|embedding|transcribe|robotics|audio|vision|aqa|computer|banana|omni|customtools|research)/i.test(n));
   }
 
   /* ---------- Claude ---------- */
@@ -374,7 +391,7 @@
 
   const api = {
     PROVIDERS, PERSONAS, MODE_LABELS, EVAL_SCHEMA, REPORT_SCHEMA, AIError,
-    toGeminiSchema, parseJSON, normalizeEvaluation, normalizeReport, systemPrompt, evalUserPrompt,
+    toGeminiSchema, parseJSON, cleanReaction, normalizeEvaluation, normalizeReport, systemPrompt, evalUserPrompt,
     evaluateAnswer, finalReport, listGeminiModels,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

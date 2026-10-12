@@ -323,6 +323,11 @@ details.more[open] summary h2 { margin-bottom: 14px; }
   padding: 24px 16px calc(16px + env(safe-area-inset-bottom));
 }
 .footer-inner { max-width: 720px; margin: 0 auto; display: flex; gap: 10px; align-items: center; }
+@media (max-width: 520px) {
+  #screen-report .footer-inner { flex-wrap: wrap; }
+  #screen-report .footer-inner .btn-wide { flex-basis: 100%; order: -1; }
+  #screen-report .footer-inner .btn-sm { flex: 1; }
+}
 
 .meter { height: 12px; background: var(--surface-2); border-radius: 999px; overflow: hidden; }
 .meter-fill { height: 100%; width: 0; background: var(--mugwort); border-radius: 999px; transition: width 80ms linear; }

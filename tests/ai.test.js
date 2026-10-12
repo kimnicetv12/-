@@ -33,3 +33,27 @@ test('평가 결과를 화면용 모양으로 정리한다', () => {
   assert.strictEqual(ev.next_is_follow_up, true);
   assert.strictEqual(ev.source, 'ai');
 });
+
+test('Gemini 키는 예전 형식과 새 형식 모두 받는다', () => {
+  const re = AI.PROVIDERS.gemini.keyPattern;
+  assert.ok(re.test('AIzaSyD-abcdefghijklmnopqrstuvwxyz012'));
+  assert.ok(re.test('AQ.Ab8Rxxxxxxxxxxxxxxxxxxxx-yyyyyyyy_zz'));
+  assert.ok(!re.test('sk-ant-abc'));
+});
+
+test('면접관 반응은 짧은 맞장구만 남긴다', () => {
+  assert.strictEqual(AI.cleanReaction('네, 잘 들었습니다.'), '네, 잘 들었습니다.');
+  assert.strictEqual(AI.cleanReaction('좋습니다. 그럼 다음으로 넘어가죠.'), '좋습니다.');
+  assert.strictEqual(AI.cleanReaction('자기소개가 짧은데, 돌발 상황은 무엇이었나요?'), '');
+  assert.strictEqual(AI.cleanReaction(''), '');
+});
+
+test('타이핑 답변이면 말하기 지표를 AI에게 보내지 않는다', () => {
+  const settings = { fieldLabel: 'IT', mode: 'mixed', persona: 'standard', followUps: true };
+  const base = { settings, history: [], question: 'Q', transcript: 'A', remaining: 2 };
+  const typed = AI.evalUserPrompt({ ...base, analysis: { textMode: true, rate: 9999 } });
+  assert.ok(!typed.includes('9999'));
+  assert.ok(typed.includes('타이핑'));
+  const spoken = AI.evalUserPrompt({ ...base, analysis: { textMode: false, rate: 300 } });
+  assert.ok(spoken.includes('300'));
+});
