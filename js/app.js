@@ -476,8 +476,18 @@
     const remaining = state.settings.count - (state.results.length + 1);
 
     // 1) 초파리 뇌는 이 컴퓨터 안에서 바로 채점한다(인터넷 불필요, 1초 이내)
-    const fly = FlyBrain.evaluate({ question, transcript, analysis, field: state.settings.field });
+    const fly = FlyBrain.evaluate({ question, transcript, analysis, field: state.settings.field, persona: state.settings.persona });
     const evaluation = Metrics.ruleBasedEvaluation({ question, analysis, timeLimitSec: state.settings.timeLimit });
+    // 측각 경보가 울렸으면 왜 깎였는지 맨 앞에 알려 준다
+    const ALARM_TIPS = {
+      offTopic: '질문이 묻는 것에 대한 답이 잘 안 보여요. 첫 문장에서 질문에 바로 답하고 시작하세요.',
+      stuffing: '키워드와 숫자만 늘어놓았어요. "상황 → 내가 한 일 → 결과"를 문장으로 이어서 말하세요.',
+      empty: '다짐과 좋은 말뿐이고 실제로 한 일이 없어요. 경험 하나를 숫자와 함께 말해 보세요.',
+      rambling: '군말이 많고 핵심이 안 보여요. 결론 한 문장부터 말한 뒤 이유를 붙이세요.',
+    };
+    const tips = fly.alarms.filter((a) => a.level >= 0.5).map((a) => ALARM_TIPS[a.id]).filter(Boolean);
+    evaluation.feedback_improve = tips.concat(evaluation.feedback_improve).slice(0, 4);
+    if (tips.length) evaluation.feedback_good = evaluation.feedback_good.filter((t) => !/구조가 드러|구체적입니다/.test(t));
     evaluation.scores = { ...fly.scores };
     evaluation.overall = Metrics.overallFromScores(evaluation.scores);
     evaluation.fly = fly;
@@ -643,6 +653,14 @@
       h('li', {}, '답변 유형: ', h('b', {}, f.typeLabel), ` (확신 ${Math.round(f.typeConfidence * 100)}%)`),
       h('li', {}, `케년세포 ${FlyBrain.N_KC.toLocaleString()}개 중 ${f.active.length}개가 반응 · 익숙함 ${Math.round(f.familiarity * 100)}%`),
     ];
+    f.alarms.filter((a) => a.level >= 0.3).forEach((a) => {
+      // 항목별 감점을 종합 점수(100점) 기준으로 환산
+      const keys = ['content', 'logic', 'specificity', 'job_fit'];
+      const wsum = ev.scores.delivery == null ? 0.8 : 1;
+      const cut = Math.round((keys.reduce((x, k, d) => x + a.penalty[d] * Metrics.WEIGHTS[k], 0) * a.level * 10) / wsum);
+      notes.push(h('li', { class: 'warn' }, `🚨 측각 경보: ${a.label} (세기 ${Math.round(a.level * 100)}% · 약 ${cut}점 감점)`));
+    });
+    if (f.personaOffset) notes.push(h('li', {}, `면접관 성격 반영: ${f.personaOffset < 0 ? '깐깐해서 항목마다 1점씩 짜게' : '다정해서 항목마다 0.5점씩 후하게'}`));
     if (f.similar) {
       const same = f.similar.sim >= 0.45;
       notes.push(h('li', { class: 'warn' }, `${same ? '거의 같은 답이에요' : '예전 답변과 많이 닮았어요'} (단어 지문 ${Math.round(f.similar.sim * 100)}% 겹침 · "${f.similar.question.slice(0, 18)}…" 때 답)`));

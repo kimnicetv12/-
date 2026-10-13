@@ -30,6 +30,12 @@
     ['sentenceFit', '문장 길이 적절성'],
     ['hedges', '자신 없는 표현'],
     ['listing', '단어 나열'],
+    ['intentMatch', '질문이 묻는 것에 답했는지'],
+    ['buzzDensity', '키워드·숫자 몰아넣기'],
+    ['particles', '자연스러운 문장(조사 사용)'],
+    ['variety', '같은 말 반복 없음'],
+    ['pastConcrete', '실제로 한 일(과거형 서술)'],
+    ['fillerText', '군말·습관어 섞임(글)'],
     ['repeats', '말 반복'],
     ['rateFit', '말 속도 적절성'],
     ['fillers', '군말'],
@@ -38,6 +44,9 @@
     ['latency', '첫 마디까지 시간'],
     ['durationFit', '답변 시간 적절성'],
   ];
+  // 중요한 냄새일수록 신호가 세다(실제 초파리도 사구체마다 투사뉴런 수·세기가 다르다)
+  let GAIN = {};
+
   const DELIVERY_FEATURES = ['rateFit', 'fillers', 'habits', 'pauses', 'latency', 'durationFit'];
   const N_PN = N_TEXT + FEATURES.length * 2; // 각 특징은 ON·OFF 두 채널(64)
   const N_KC = 2000;
@@ -52,7 +61,7 @@
     list: '나열형',
     short: '단답형',
   };
-  const STORE_KEY = 'malang.flybrain.v2';
+  const STORE_KEY = 'malang.flybrain.v3'; // 입력 구조가 바뀌면 숫자를 올린다(예전 뇌는 버림)
   const SIMILAR_AT = 0.25; // 단어 지문이 이만큼 겹치면 '닮은 답'(0.45 이상이면 거의 같은 답)
   const MEMORY_KEY = 'malang.flymemory.v1';
 
@@ -93,7 +102,31 @@
     return clamp01(1 - d / spread);
   }
 
-  /* ---------- 투사뉴런: 답변 → 64개 입력 ---------- */
+  /* ---------- 질문 의도: 질문이 무엇을 묻는지, 그런 답에 보통 나오는 말 ---------- */
+  const INTENTS = [
+    { q: /자기소개|소개 부탁/, cues: /(저는|입니다|지원자|전공|경험|강점|활동|맡)/g },
+    { q: /지원.{0,6}(동기|이유)|왜 .{0,10}지원|동기/, cues: /(지원|관심|계기|이유|회사|귀사|기관|방송사|학과|서비스|제품|비전|하고 싶|되고 싶|기여|직접 써)/g },
+    { q: /강점|약점|장점|단점/, cues: /(강점|약점|장점|단점|부족|보완|고치|극복|개선하)/g },
+    { q: /갈등|충돌|의견.{0,8}(다르|갈|차이)|다툼/, cues: /(갈등|충돌|부딪|다투|싸웠|싸우|의견|입장|설득|합의|대화|면담|조율|절충|타협|해결|탓)/g },
+    { q: /실패|좌절|힘들었던|어려웠던/, cues: /(실패|실수|좌절|어려|힘들|배웠|깨달|다시|극복|교훈)/g },
+    { q: /프로젝트|기술적|개발|구현|디버깅|버그/, cues: /(프로젝트|개발|구현|설계|기술|서버|코드|데이터|역할|맡|구조|성능|테스트|배포|API|앱|로그|오류|버그)/g },
+    { q: /하시겠습니까|어떻게 하시|대처|대응하|만약|생긴다면|낸다면/, cues: /(먼저|하겠습니다|하겠|대처|대응|확인|보고|설명|양해|해결|조치|공감)/g },
+    { q: /마지막으로|하고 싶은 말/, cues: /(감사|마지막|기회|입사|되겠|기여|포부|다짐|하겠)/g },
+    { q: /배우|학습|공부하는/, cues: /(배우|배울|공부|학습|문서|강의|정리|연습|익히|만들어)/g },
+    { q: /활동|학창|열정적|참여한/, cues: /(활동|동아리|참여|맡|대회|봉사|학생회|멘토링|방송부)/g },
+    { q: /팔아|판매해/, cues: /(이 펜|제품|장점|필요|드리|가격|구매|사용|서명)/g },
+    { q: /생각하나요|생각하십니까|무엇이라고|조건|덕목/, cues: /(생각합니다|이라고|중요|왜냐하면|때문|이유|조건|덕목)/g },
+    { q: /설득/, cues: /(설득|제안|권|판매|팔|손님|고객|동의)/g },
+    { q: /합의/, cues: /(합의|의견|근거|측정|정했|맞춰|조율)/g },
+  ];
+
+  function intentMatchOf(question, text) {
+    const hit = INTENTS.find((it) => it.q.test(question));
+    if (!hit) return 0.5; // 모르는 유형의 질문이면 판단 보류
+    return clamp01(count(text, hit.cues) / 2);
+  }
+
+  /* ---------- 투사뉴런: 답변 → 입력 ---------- */
   function sentencesOf(text) {
     return text.split(/(?<=[다요죠까])\s+|[.!?。]\s*/).map((s) => s.trim()).filter((s) => s.length > 1);
   }
@@ -113,6 +146,8 @@
     const jobWords = (JOB_WORDS[field] || JOB_WORDS.general).filter((w) => text.includes(w)).length;
     const a = analysis;
     const typed = !!a.textMode || a.rate == null;
+    const wordList = text.match(/[가-힣A-Za-z0-9%]+/g) || [];
+    const buzz = count(text, /(첫째|둘째|셋째|결론|결과|성과|달성|개선|향상|프로젝트|경험)/g) + count(text, /\d+/g);
 
     const f = {
       length: clamp01(syll / 250),
@@ -122,13 +157,19 @@
       numbers: clamp01(count(text, /\d+(?:[.,]\d+)?|(?:한|두|세|네|다섯)\s?(?:번|명|달|가지|개월)|[일이삼사오육칠팔구십백천만]+\s?(?:년|개월|명|퍼센트|배|회|위)/g) / 3),
       experience: clamp01(count(text, /(경험|당시|때|프로젝트|활동|맡아|맡았|했습니다|했고|였습니다|시절)/g) / 5),
       result: clamp01(count(text, /(결과|성과|높였|줄였|올랐|늘었|개선|달성|받았|배웠|얻었|완성|해결|합의)/g) / 3),
-      cliche: clamp01(count(text, /(열정|최선|성실|노력하|열심히|꿈이|꼭 오고|책임감|인재|잘 부탁|성장하고 싶)/g) / 3),
+      cliche: clamp01(count(text, /(열정|최선|성실|노력하|열심히|꿈이|꼭 오고|책임감|인재|잘 부탁|성장하고 싶|사람입니다|항상|무엇보다|모든|소통|존중|열린 마음|확신|꼭 필요|원만)/g) / 3),
       relevance: clamp01(relevance),
       jobWords: clamp01(jobWords / 3),
       formal: clamp01(count(text, /(습니다|니다|입니다|겠습니다)/g) / sentCount),
       sentenceFit: fit(avgSent, 20, 55, 30),
       hedges: clamp01(count(text, /(것 같|잘 모르|아마|딱히|글쎄|그냥)/g) / 2),
       listing: clamp01((count(text, /,/g) + count(text, /(그리고|또한|도 중요)/g)) / 5),
+      intentMatch: intentMatchOf(question, text),
+      buzzDensity: clamp01(buzz / Math.max(1, wordList.length) / 0.4),
+      particles: clamp01(wordList.filter((w) => /(은|는|이|가|을|를|에|의|로|와|과|도|에서|에게|으로|부터|까지|처럼|보다|하고|해서|하며|하면서|는데|지만)$/.test(w)).length / Math.max(1, wordList.length) / 0.45),
+      variety: wordList.length ? clamp01((new Set(wordList).size / wordList.length - 0.5) / 0.4) : 0,
+      pastConcrete: clamp01(count(text, /(했|었|았|였|왔|줬|됐|웠)(습니다|고|는데|어요|거든요|지만|다|더니|으며)/g) / 4),
+      fillerText: clamp01(wordList.filter((w) => /^(음|어|아|그러니까|뭐|아무튼|사실|약간|그냥|막|좀|이제|뭔가)$/.test(w)).length / Math.max(1, wordList.length) / 0.08),
       repeats: clamp01((a.repeats || 0) / 3),
       // 말하기 특징: 타이핑이면 '모름(0.5)'
       rateFit: typed ? 0.5 : a.rate ? fit(a.rate, 250, 340, 120) : 0,
@@ -154,8 +195,9 @@
     if (max > 0) for (let i = 0; i < N_TEXT; i++) pn[i] /= max;
     // 특징마다 ON(값)·OFF(1-값) 채널: 실제 초파리 사구체처럼 켜질 때·꺼질 때 반응하는 쌍
     FEATURES.forEach(([name], i) => {
-      pn[N_TEXT + i * 2] = f[name];
-      pn[N_TEXT + i * 2 + 1] = 1 - f[name];
+      const g = GAIN[name] || 1;
+      pn[N_TEXT + i * 2] = g * f[name];
+      pn[N_TEXT + i * 2 + 1] = g * (1 - f[name]);
     });
     return { pn, features: f };
   }
@@ -224,6 +266,29 @@
       act[k] = s;
     }
     return Array.from(act.keys()).sort((a, b) => act[b] - act[a] || a - b).slice(0, N_ACTIVE);
+  }
+
+  /* ---------- 측각(lateral horn): 타고난 경보 회로 ----------
+   * 초파리는 배워서 판단하는 버섯체와 별개로, 상한 냄새처럼 위험한 냄새에 바로 반응하는 측각 회로가 있다.
+   * 면접에서 '위험한 냄새'는 동문서답·키워드 몰아넣기·빈말·횡설수설. 경보가 울리면 점수를 깎는다.
+   * 깎는 양(항목별, 경보 1.0일 때): [질문 적합성, 논리, 구체성, 직무 적합성] */
+  const ALARMS = [
+    { id: 'offTopic', label: '동문서답 의심', penalty: [6, 2, 2, 4],
+      // 너무 짧은 답은 '짧아서' 이미 낮게 나오므로 동문서답으로 또 깎지 않는다
+      level: (f) => clamp01((0.34 - f.intentMatch) / 0.34) * clamp01((f.length - 0.12) / 0.15) },
+    { id: 'stuffing', label: '키워드만 나열', penalty: [6, 7, 6, 5],
+      level: (f) => clamp01((f.buzzDensity - 0.6) / 0.3) },
+    { id: 'empty', label: '알맹이 없는 다짐', penalty: [3, 2, 4, 3],
+      level: (f) => clamp01((f.cliche - 0.5) / 0.4) * (1 - f.numbers) * (f.pastConcrete < 0.5 ? 1 : 0.5) },
+    { id: 'rambling', label: '횡설수설', penalty: [3, 4, 2, 2],
+      level: (f) => clamp01((f.fillerText - 0.5) / 0.4) },
+  ];
+
+  function lateralHorn(features) {
+    const fired = ALARMS.map((a) => ({ id: a.id, label: a.label, level: a.level(features), penalty: a.penalty })).filter((a) => a.level > 0.05);
+    const cut = [0, 0, 0, 0, 0];
+    fired.forEach((a) => a.penalty.forEach((p, d) => (cut[d] += p * a.level)));
+    return { fired, cut };
   }
 
   /* ---------- 버섯체 출력뉴런 + 도파민 학습 ---------- */
@@ -367,6 +432,29 @@
     { rate: 195, fillerPerMin: 2.5, habitPerMin: 2, longPauses: 4, firstSpeechSec: 6.5, speakingSec: 80 },
   ];
 
+  /** 좋은 답을 엉뚱한 질문에 붙여 '동문서답'을 가르친다(내용은 좋아도 질문에 안 맞으면 감점). */
+  function offTopicPairs(entries) {
+    const good = entries.filter((e) => e.s[0] >= 7);
+    const out = [];
+    good.forEach((e, i) => {
+      const other = good.slice(i + 1).concat(good.slice(0, i)).find((o) => {
+        const ia = INTENTS.findIndex((it) => it.q.test(e.q));
+        const ib = INTENTS.findIndex((it) => it.q.test(o.q));
+        return ia !== ib && ia >= 0 && ib >= 0;
+      });
+      if (!other) return;
+      out.push({
+        field: other.field,
+        type: e.type,
+        q: other.q,
+        a: e.a,
+        s: [2, Math.max(0, e.s[1] - 2), Math.max(0, e.s[2] - 2), other.field === e.field ? Math.round(e.s[3] * 0.5) : 2],
+        offTopic: true,
+      });
+    });
+    return out;
+  }
+
   function seedSamples(entries) {
     const out = [];
     for (const e of entries) {
@@ -382,7 +470,12 @@
   }
 
   function trainInnate(brain, entries, epochs = 30) {
-    const samples = seedSamples(entries).map((s) => ({ ...s, code: kenyon(projectionInput(s.args).pn).active }));
+    const samples = seedSamples(entries.concat(offTopicPairs(entries))).map((s) => {
+      const { pn, features } = projectionInput(s.args);
+      const { cut } = lateralHorn(features);
+      // 버섯체는 '경보로 깎일 몫을 뺀 원래 실력'을 배운다. 깎는 건 측각이 한다
+      return { ...s, code: kenyon(pn).active, targets: s.targets.map((t, d) => Math.min(10, t + cut[d])) };
+    });
     const r = rng(7);
     for (let ep = 0; ep < epochs; ep++) {
       const order = samples.slice().sort(() => r() - 0.5);
@@ -460,12 +553,17 @@
   }
 
   /** 인식 + 평가. 아직 배우지는 않는다(점수를 먼저 내고, 선생님 점수가 오면 learn). */
-  function evaluate({ question, transcript, analysis, field }) {
+  const PERSONA_OFFSET = { kind: 0.5, standard: 0, strict: -1 };
+
+  function evaluate({ question, transcript, analysis, field, persona = 'standard' }) {
     if (!brain) init();
     const typed = !!(analysis && analysis.textMode);
     const { pn, features } = projectionInput({ question, transcript, analysis, field });
     const { active, act } = kenyon(pn);
-    const raw = brain.readout(active);
+    const mb = brain.readout(active); // 버섯체가 배운 판단
+    const horn = lateralHorn(features); // 측각의 타고난 경보
+    const offset = PERSONA_OFFSET[persona] || 0; // 면접관 성격(깐깐하면 짜게)
+    const raw = mb.map((v, i) => Math.max(0, Math.min(10, v - horn.cut[i] + offset)));
     const scores = {};
     DIMS.forEach((d, i) => (scores[d] = Math.round(raw[i])));
     if (typed) scores.delivery = null;
@@ -486,6 +584,10 @@
     return {
       scores,
       raw,
+      mb,
+      alarms: horn.fired,
+      hornCut: horn.cut,
+      personaOffset: offset,
       active,
       pn: Array.from(pn),
       kcActivity: act,
@@ -503,7 +605,10 @@
   /** 선생님 점수(0~10, 항목별)로 배운다. delivery가 null이면 그 항목은 건너뛴다. */
   function learn(result, teacherScores, lr = 0.12) {
     if (!brain) init();
-    brain.learn(result.active, DIMS.map((d) => (teacherScores[d] == null ? null : teacherScores[d])), lr);
+    // 선생님 점수에서 측각 경보·성격 보정 몫을 되돌려, 버섯체가 배울 '원래 실력' 점수로 바꾼다
+    const cut = result.hornCut || [0, 0, 0, 0, 0];
+    const off = result.personaOffset || 0;
+    brain.learn(result.active, DIMS.map((d, i) => (teacherScores[d] == null ? null : Math.max(0, Math.min(10, teacherScores[d] + cut[i] - off)))), lr);
     brain.lessons += 1;
   }
 
@@ -520,7 +625,7 @@
 
   const api = {
     N_PN, N_KC, N_ACTIVE, PN_PER_KC, DIMS, TYPES, FEATURES, DELIVERY_FEATURES, TYPE_LABELS,
-    Brain, featuresOf, projectionInput, kenyon, wiringOf, wordCode, jaccard, trainInnate, seedSamples,
+    ALARMS, lateralHorn, Brain, featuresOf, projectionInput, setGain: (g) => (GAIN = g), kenyon, wiringOf, wordCode, jaccard, trainInnate, seedSamples,
     init, save, reset, evaluate, learn, remember, stats,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

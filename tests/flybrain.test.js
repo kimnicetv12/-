@@ -63,3 +63,28 @@ test('뇌를 저장했다 불러와도 같은 점수가 나온다', () => {
   const code = F.kenyon(F.projectionInput({ question: 'Q', transcript: GOOD, analysis: { textMode: true }, field: 'sales' }).pn).active;
   b.readout(code).forEach((v, i) => assert.ok(Math.abs(v - b2.readout(code)[i]) < 0.1));
 });
+
+test('함정 답변: 키워드만 나열하면 측각 경보가 울리고 좋은 답보다 한참 낮다', () => {
+  F.init({ fresh: true });
+  const q = '처음 보는 사람을 설득해 본 경험을 말씀해 주세요.';
+  const stuffed = '결론부터 첫째 설득 경험 3년 고객 50명 성과 20% 달성 결과 둘째 개선 향상 결과적으로 성과 달성입니다.';
+  const s = F.evaluate({ question: q, transcript: stuffed, analysis: { textMode: true }, field: 'sales' });
+  const g = F.evaluate({ question: q, transcript: GOOD, analysis: { textMode: true }, field: 'sales' });
+  assert.ok(s.alarms.some((a) => a.id === 'stuffing' && a.level > 0.5));
+  assert.ok(M.overallFromScores(g.scores) - M.overallFromScores(s.scores) >= 30);
+});
+
+test('함정 답변: 같은 좋은 답이라도 엉뚱한 질문에 하면 동문서답으로 깎인다', () => {
+  const on = F.evaluate({ question: '처음 보는 사람을 설득해 본 경험을 말씀해 주세요.', transcript: GOOD, analysis: { textMode: true }, field: 'sales' });
+  const off = F.evaluate({ question: '공직자에게 가장 중요한 덕목은 무엇이라고 생각하나요?', transcript: GOOD, analysis: { textMode: true }, field: 'sales' });
+  assert.ok(off.alarms.some((a) => a.id === 'offTopic'));
+  assert.ok(on.scores.content - off.scores.content >= 3);
+});
+
+test('깐깐한 면접관이면 같은 답도 더 짜게, 선생님 점수를 배울 땐 그 몫을 되돌린다', () => {
+  const args = { question: 'Q', transcript: GOOD, analysis: { textMode: true }, field: 'sales' };
+  const std = F.evaluate({ ...args, persona: 'standard' });
+  const strict = F.evaluate({ ...args, persona: 'strict' });
+  assert.ok(strict.raw[0] < std.raw[0]);
+  assert.strictEqual(strict.personaOffset, -1);
+});
