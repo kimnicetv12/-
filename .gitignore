@@ -1,0 +1,5 @@
+# Studio autosaves and lock files
+*.rbxl.lock
+*.rbxlx.lock
+*.rbxl
+sourcemap.json
