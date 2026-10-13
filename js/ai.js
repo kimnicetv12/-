@@ -9,9 +9,10 @@
       // 예전 형식(AIza...)과 새 형식(AQ....) 모두 허용
       keyPattern: /^(AIza[0-9A-Za-z_-]{20,}|AQ\.[0-9A-Za-z_.-]{20,})$/,
       keyUrl: 'https://aistudio.google.com/apikey',
-      defaultModel: 'gemini-3.8-flash',
-      // 기본 모델이 없거나, 혼잡하거나, 무료 한도에 걸리면 차례로 시도
-      fallbackModels: ['gemini-3.8-flash', 'gemini-3.5-flash', 'gemini-3.6-flash', 'gemini-3.5-flash-lite'],
+      // 실측: flash-lite가 2초대로 가장 빠르고, 무료 등급에서 혼잡(503)도 가장 적었다
+      defaultModel: 'gemini-3.5-flash-lite',
+      // 기본 모델이 없거나, 혼잡하거나, 무료 한도에 걸리거나, 늦으면 차례로 시도
+      fallbackModels: ['gemini-3.5-flash-lite', 'gemini-3.8-flash', 'gemini-3.5-flash', 'gemini-3.6-flash'],
     },
     claude: {
       label: 'Anthropic Claude',
@@ -79,11 +80,12 @@
   };
 
   class AIError extends Error {
-    constructor(message, { status, retryable, modelMissing } = {}) {
+    constructor(message, { status, retryable, modelMissing, retryThinking } = {}) {
       super(message);
       this.status = status;
       this.retryable = !!retryable;
       this.modelMissing = !!modelMissing;
+      this.retryThinking = !!retryThinking;
     }
   }
 
@@ -228,39 +230,66 @@
     ].join('\n');
   }
 
+  /* ---------- 시간 제한 ---------- */
+  const ATTEMPT_MS = 9000; // 모델 하나를 기다리는 최대 시간
+  const COOLDOWN_MS = 120000; // 혼잡·한도·지연으로 실패한 모델은 2분간 뒤로 미룬다
+
+  async function fetchWithin(url, opts, ms) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), Math.max(500, ms));
+    try {
+      return await fetch(url, { ...opts, signal: ctrl.signal });
+    } catch (e) {
+      if (e && e.name === 'AbortError') throw new AIError('응답이 너무 늦어요.', { status: 408, retryable: true });
+      throw new AIError('네트워크 연결에 실패했습니다.', { retryable: true });
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   /* ---------- Gemini ---------- */
   const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
   const workingModel = {}; // 성공한 모델 기억
+  const cooldown = new Map(); // 모델 → 이 시각까지 뒤로 미룸
+  const noThinkingCfg = new Set(); // 생각 설정을 거부한 모델
+  // 생각(thinking)을 줄이면 훨씬 빨라진다. 모델마다 허용하는 가장 낮은 단계
+  const THINKING = {
+    'gemini-3.8-flash': 'low',
+    'gemini-3.6-flash': 'minimal',
+    'gemini-3.5-flash': 'minimal',
+    'gemini-3.5-flash-lite': 'minimal',
+  };
 
-  async function geminiOnce(apiKey, model, { system, user, schema, maxTokens }) {
-    let res;
-    try {
-      res = await fetch(`${GEMINI_BASE}/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: system }] },
-          contents: [{ role: 'user', parts: [{ text: user }] }],
-          generationConfig: {
-            responseMimeType: 'application/json',
-            responseSchema: toGeminiSchema(schema),
-            maxOutputTokens: maxTokens,
-          },
-        }),
-      });
-    } catch (e) {
-      throw new AIError('네트워크 연결에 실패했습니다.', { retryable: true });
-    }
+  async function geminiOnce(apiKey, model, { system, user, schema, maxTokens }, ms) {
+    const level = noThinkingCfg.has(model) ? null : THINKING[model];
+    const res = await fetchWithin(`${GEMINI_BASE}/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: system }] },
+        contents: [{ role: 'user', parts: [{ text: user }] }],
+        generationConfig: {
+          responseMimeType: 'application/json',
+          responseSchema: toGeminiSchema(schema),
+          maxOutputTokens: maxTokens,
+          ...(level ? { thinkingConfig: { thinkingLevel: level } } : {}),
+        },
+      }),
+    }, ms);
     let data = null;
     try {
       data = await res.json();
     } catch (_) { /* 본문 없음 */ }
     if (!res.ok) {
       const msg = (data && data.error && data.error.message) || '';
+      if (res.status === 400 && level && /think/i.test(msg)) {
+        noThinkingCfg.add(model);
+        throw new AIError('생각 설정 없이 다시 시도합니다.', { status: 400, retryThinking: true });
+      }
       if (res.status === 400 && /api key/i.test(msg)) throw new AIError('Gemini API 키가 올바르지 않습니다.', { status: 400 });
       if (res.status === 403) throw new AIError('이 키로는 Gemini API를 쓸 수 없습니다. AI Studio에서 키를 다시 확인하세요.', { status: 403 });
       if (res.status === 404) throw new AIError(`모델 ${model}을(를) 찾을 수 없습니다.`, { status: 404, modelMissing: true });
-      if (res.status === 429) throw new AIError('무료 사용량 한도(분당/일일 요청 수)에 걸렸습니다. 1분쯤 뒤에 다시 해 보세요.', { status: 429, retryable: true });
+      if (res.status === 429) throw new AIError('무료 사용량 한도(분당/일일 요청 수)에 걸렸습니다.', { status: 429, retryable: true });
       if (res.status >= 500) throw new AIError('Gemini 서버가 혼잡합니다.', { status: res.status, retryable: true });
       throw new AIError(`요청 오류(${res.status}) ${msg}`.trim(), { status: res.status });
     }
@@ -277,19 +306,47 @@
     return parseJSON(text);
   }
 
+  /** 테스트용: 기억해 둔 모델 상태를 비운다 */
+  function resetGeminiState() {
+    delete workingModel.gemini;
+    cooldown.clear();
+    noThinkingCfg.clear();
+  }
+
+  /** 시도할 모델 순서: 마지막으로 성공한 모델 → 고른 모델 → 나머지. 쉬는 중인 모델은 맨 뒤로. */
+  function geminiOrder(preferred, now = Date.now()) {
+    const all = [...new Set([workingModel.gemini, preferred, ...PROVIDERS.gemini.fallbackModels].filter(Boolean))];
+    const ready = all.filter((m) => !(cooldown.get(m) > now));
+    const resting = all.filter((m) => cooldown.get(m) > now).sort((a, b) => cooldown.get(a) - cooldown.get(b));
+    return ready.concat(resting);
+  }
+
   async function gemini(apiKey, preferred, req) {
-    const chain = [...new Set([workingModel.gemini, preferred, ...PROVIDERS.gemini.fallbackModels].filter(Boolean))];
-    let lastErr;
-    for (const model of chain) {
-      try {
-        const out = await geminiOnce(apiKey, model, req);
-        workingModel.gemini = model;
-        return out;
-      } catch (e) {
-        lastErr = e;
-        // 모델이 없거나(404), 무료 한도(429, 모델별로 따로 셈)거나, 혼잡(5xx)하면 다음 모델로
-        if (!(e.modelMissing || e.status === 429 || e.status >= 500)) throw e;
+    let lastErr = new AIError('AI 선생님이 제한 시간 안에 답하지 못했어요.', { status: 408 });
+    for (let pass = 0; pass < 2; pass++) {
+      for (const model of geminiOrder(preferred)) {
+        const left = req.deadline - Date.now();
+        if (left < 1200) throw lastErr;
+        try {
+          let out;
+          try {
+            out = await geminiOnce(apiKey, model, req, Math.min(ATTEMPT_MS, left));
+          } catch (e) {
+            if (!e.retryThinking) throw e;
+            out = await geminiOnce(apiKey, model, req, Math.min(ATTEMPT_MS, req.deadline - Date.now()));
+          }
+          workingModel.gemini = model;
+          cooldown.delete(model);
+          return out;
+        } catch (e) {
+          lastErr = e;
+          // 모델이 없거나(404), 한도(429, 모델별로 따로 셈)·혼잡(5xx)·지연(408)이면 다음 모델로
+          if (!(e.modelMissing || e.status === 429 || e.status === 408 || e.status >= 500 || (e.retryable && !e.status))) throw e;
+          if (workingModel.gemini === model) delete workingModel.gemini;
+          cooldown.set(model, Date.now() + (e.modelMissing ? 24 * 3600e3 : COOLDOWN_MS));
+        }
       }
+      await new Promise((r) => setTimeout(r, 600));
     }
     throw lastErr;
   }
@@ -310,10 +367,8 @@
   }
 
   /* ---------- Claude ---------- */
-  async function claudeOnce(apiKey, model, { system, user, schema, effort }) {
-    let res;
-    try {
-      res = await fetch('https://api.anthropic.com/v1/messages', {
+  async function claudeOnce(apiKey, model, { system, user, schema, effort, deadline }) {
+    const res = await fetchWithin('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
@@ -330,10 +385,7 @@
           output_config: { effort, format: { type: 'json_schema', schema } },
           fallbacks: 'default',
         }),
-      });
-    } catch (e) {
-      throw new AIError('네트워크 연결에 실패했습니다.', { retryable: true });
-    }
+    }, deadline - Date.now());
     if (!res.ok) {
       let detail = '';
       try {
@@ -352,47 +404,49 @@
   }
 
   /* ---------- 공개 API ---------- */
-  async function call(ai, req) {
-    const run = () => (ai.provider === 'claude'
-      ? claudeOnce(ai.apiKey, ai.model || PROVIDERS.claude.defaultModel, req)
-      : gemini(ai.apiKey, ai.model || PROVIDERS.gemini.defaultModel, req));
+  /** budgetMs 안에 끝내거나 포기한다. 포기하면 앱은 초파리 뇌 점수와 기본 피드백으로 진행한다. */
+  async function call(ai, req, budgetMs) {
+    const deadline = Date.now() + budgetMs;
+    const r = { ...req, deadline };
+    if (ai.provider !== 'claude') return gemini(ai.apiKey, ai.model || PROVIDERS.gemini.defaultModel, r);
+    const model = ai.model || PROVIDERS.claude.defaultModel;
     try {
-      return await run();
+      return await claudeOnce(ai.apiKey, model, r);
     } catch (e) {
-      if (!(e instanceof AIError) || !e.retryable) throw e;
-      await new Promise((r) => setTimeout(r, e.status === 429 ? 8000 : 1500));
-      return run();
+      if (!(e instanceof AIError) || !e.retryable || deadline - Date.now() < 3000) throw e;
+      await new Promise((res) => setTimeout(res, 800));
+      return claudeOnce(ai.apiKey, model, r);
     }
   }
 
   /** 방금 답변을 평가하고 다음 질문을 받는다. ai = { provider, apiKey, model } */
-  async function evaluateAnswer({ ai, settings, history, question, transcript, analysis, remaining }) {
+  async function evaluateAnswer({ ai, settings, history, question, transcript, analysis, remaining, budgetMs = 15000 }) {
     const raw = await call(ai, {
       system: systemPrompt(settings),
       user: evalUserPrompt({ settings, history, question, transcript, analysis, remaining }),
       schema: EVAL_SCHEMA,
       effort: 'low',
-      maxTokens: 8192,
-    });
+      maxTokens: 4096,
+    }, budgetMs);
     return normalizeEvaluation(raw);
   }
 
   /** 전체 면접 총평. */
-  async function finalReport({ ai, settings, results, summary }) {
+  async function finalReport({ ai, settings, results, summary, budgetMs = 20000 }) {
     const raw = await call(ai, {
       system: systemPrompt(settings),
       user: reportUserPrompt({ results, summary }),
       schema: REPORT_SCHEMA,
-      effort: 'medium',
-      maxTokens: 8192,
-    });
+      effort: 'low',
+      maxTokens: 4096,
+    }, budgetMs);
     return normalizeReport(raw);
   }
 
   const api = {
     PROVIDERS, PERSONAS, MODE_LABELS, EVAL_SCHEMA, REPORT_SCHEMA, AIError,
     toGeminiSchema, parseJSON, cleanReaction, normalizeEvaluation, normalizeReport, systemPrompt, evalUserPrompt,
-    evaluateAnswer, finalReport, listGeminiModels,
+    evaluateAnswer, finalReport, listGeminiModels, geminiOrder, resetGeminiState,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.AI = api;

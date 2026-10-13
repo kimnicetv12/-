@@ -148,14 +148,17 @@
     $('#key-link').href = p.keyUrl;
     $('#key-link').textContent = provider() === 'gemini' ? '무료 키 받기 →' : '키 받기 →';
     $('#model-row').hidden = provider() !== 'gemini';
-    fillModels(p.fallbackModels, preferredModel || p.defaultModel);
+    // 예전 기본값(gemini-3.8-flash)은 무료 등급에서 자주 혼잡해 느렸다 → 빠른 새 기본값으로 바꿔 준다
+    const pick = !preferredModel || preferredModel === 'gemini-3.8-flash' ? p.defaultModel : preferredModel;
+    fillModels(p.fallbackModels, pick);
     setApiStatus($('#api-key').value ? '확인 전' : '미연결', '');
   }
 
   function fillModels(models, selected) {
     const sel = $('#model-select');
     const list = [...new Set([selected, ...models].filter(Boolean))];
-    sel.replaceChildren(...list.map((m) => h('option', { value: m, selected: m === selected }, m)));
+    const fast = AI.PROVIDERS.gemini.defaultModel;
+    sel.replaceChildren(...list.map((m) => h('option', { value: m, selected: m === selected }, m === fast ? `${m} · 빠름(추천)` : m)));
   }
 
   function setApiStatus(text, kind) {
@@ -467,64 +470,91 @@
       : state.raw;
     const analysis = Metrics.analyzeDelivery(raw);
     analysis.textMode = textMode;
-
-    state.phase = 'evaluating';
     $('#answer-foot').hidden = true;
-    const face = $('#interviewer');
-    Mascot.setState(face, 'thinking');
-    $('#reaction').hidden = false;
-    $('#reaction').textContent = '음… 답변을 곰곰이 생각하는 중이에요';
 
     const { question, followUp } = state.current;
     const remaining = state.settings.count - (state.results.length + 1);
-    let evaluation;
-    if (state.settings.ai) {
-      try {
-        evaluation = await AI.evaluateAnswer({
-          ai: state.settings.ai,
-          settings: state.settings,
-          history: state.results.map((r) => ({ question: r.question, transcript: r.transcript })),
-          question,
-          transcript,
-          analysis,
-          remaining,
-        });
-        if (textMode) evaluation.scores.delivery = null;
-        evaluation.overall = Metrics.overallFromScores(evaluation.scores);
-      } catch (e) {
-        toast(`AI 선생님 연결 실패: ${e.message} 이번 답변은 초파리 뇌 혼자 채점할게요.`, 7000);
-      }
-    }
-    if (!evaluation) evaluation = Metrics.ruleBasedEvaluation({ question, analysis, timeLimitSec: state.settings.timeLimit });
-    if (state.phase !== 'evaluating') return; // 채점 중 면접 종료
 
-    // 점수는 초파리 뇌가 매긴다. AI 점수는 선생님 점수로 보여주고, 초파리가 그걸 보고 배운다.
+    // 1) 초파리 뇌는 이 컴퓨터 안에서 바로 채점한다(인터넷 불필요, 1초 이내)
     const fly = FlyBrain.evaluate({ question, transcript, analysis, field: state.settings.field });
-    const teacher = evaluation.source === 'ai' ? { ...evaluation.scores } : null;
-    evaluation.teacherScores = teacher;
-    evaluation.teacherOverall = teacher ? Metrics.overallFromScores(teacher) : null;
+    const evaluation = Metrics.ruleBasedEvaluation({ question, analysis, timeLimitSec: state.settings.timeLimit });
     evaluation.scores = { ...fly.scores };
     evaluation.overall = Metrics.overallFromScores(evaluation.scores);
     evaluation.fly = fly;
-    if (teacher) FlyBrain.learn(fly, teacher);
+    evaluation.teacherOverall = null;
     FlyBrain.remember({ question, result: fly });
     FlyBrain.save();
 
-    state.results.push({ question, followUp, transcript, analysis, evaluation });
+    const record = { question, followUp, transcript, analysis, evaluation, remaining };
+    state.results.push(record);
     updateProgress();
-    $('#reaction').hidden = true;
 
-    const next = remaining > 0 ? nextQuestion(evaluation, remaining) : null;
-    const reaction = evaluation.source === 'ai' ? evaluation.interviewer_reaction : '';
+    // 2) AI 선생님은 뒤에서 따로 부른다. 늦거나 실패해도 결과 화면은 기다리지 않는다
+    record.aiPromise = state.settings.ai ? askTeacher(record) : null;
+
+    const face = $('#interviewer');
     if (state.settings.feedbackTiming === 'each') {
       state.phase = 'feedback';
       Mascot.setState(face, moodFor(evaluation.overall));
-      renderSheet(evaluation, analysis, next, reaction);
-    } else if (next) {
-      askQuestion({ ...next, reaction });
-    } else {
-      finish();
+      renderSheet(record);
+      return;
     }
+    // 실전 모드: 다음 질문만 정해지면 바로 넘어간다(AI가 늦으면 질문 은행에서)
+    state.phase = 'evaluating';
+    Mascot.setState(face, 'thinking');
+    $('#reaction').hidden = false;
+    $('#reaction').textContent = '음… 다음 질문을 고르는 중이에요';
+    await waitTeacher(record);
+    if (state.phase !== 'evaluating') return; // 그 사이 면접 종료
+    goNext(record);
+  }
+
+  const TEACHER_BUDGET_MS = 15000; // AI 선생님을 기다리는 최대 시간
+
+  /** AI 선생님 채점·피드백·다음 질문을 받아 기록에 더하고, 초파리 뇌가 배운다. */
+  async function askTeacher(record) {
+    const ev = record.evaluation;
+    try {
+      const ai = await AI.evaluateAnswer({
+        ai: state.settings.ai,
+        settings: state.settings,
+        history: state.results.filter((r) => r !== record).map((r) => ({ question: r.question, transcript: r.transcript })),
+        question: record.question,
+        transcript: record.transcript,
+        analysis: record.analysis,
+        remaining: record.remaining,
+        budgetMs: TEACHER_BUDGET_MS,
+      });
+      if (record.analysis.textMode) ai.scores.delivery = null;
+      ev.teacherScores = ai.scores;
+      ev.teacherOverall = Metrics.overallFromScores(ai.scores);
+      ev.feedback_good = ai.feedback_good;
+      ev.feedback_improve = ai.feedback_improve;
+      ev.better_answer = ai.better_answer;
+      ev.interviewer_reaction = ai.interviewer_reaction;
+      ev.next_question = ai.next_question;
+      ev.next_is_follow_up = ai.next_is_follow_up;
+      ev.source = 'ai';
+      FlyBrain.learn(ev.fly, ai.scores);
+      FlyBrain.save();
+    } catch (e) {
+      record.aiError = e.message;
+    }
+    record.aiDone = true;
+    refreshSheet(record);
+  }
+
+  /** 다음으로 넘어가기 전에 AI 선생님 답을 기다린다(이미 왔으면 바로). */
+  function waitTeacher(record) {
+    return record.aiPromise || Promise.resolve();
+  }
+
+  function goNext(record) {
+    const ev = record.evaluation;
+    const next = record.remaining > 0 ? nextQuestion(ev, record.remaining) : null;
+    const reaction = ev.source === 'ai' ? ev.interviewer_reaction : '';
+    if (next) askQuestion({ ...next, reaction });
+    else finish();
   }
 
   function tierOf(score) {
@@ -544,39 +574,71 @@
     return { question: pick || Questions.CLOSER, followUp: false };
   }
 
-  function renderSheet(ev, analysis, next, reaction) {
+  function renderSheet(record) {
+    const ev = record.evaluation;
     const tier = tierOf(ev.overall);
     const title = { good: '아주 좋았어요!', okay: '좋아요, 조금만 더!', low: '괜찮아요, 다시 해봐요!' }[tier];
     const sheet = $('#sheet');
     sheet.className = `memo-wrap ${tier}`;
+    const last = record.remaining <= 0;
+    const nextBtn = h('button', {
+      type: 'button',
+      class: 'btn btn-main btn-wide',
+      onclick: async (e) => {
+        const btn = e.currentTarget;
+        if (!record.aiDone && record.aiPromise) {
+          btn.disabled = true;
+          btn.textContent = '✨ AI 선생님 질문 기다리는 중…';
+          await waitTeacher(record);
+        }
+        if (state.phase === 'feedback') goNext(record);
+      },
+    }, last ? '성적표 보기' : '다음 질문');
+    sheet._record = record;
     $('#sheet-body').replaceChildren(
       h('div', { class: 'memo-head' },
         mascot(moodFor(ev.overall), { glasses: state.settings.persona === 'strict' }),
         h('div', { class: 'memo-title' },
-          h('p', { class: 'memo-kicker' }, `면접관 메모 · Q${state.results.length} · 🪰 초파리 뇌 채점`),
+          h('p', { class: 'memo-kicker' }, `면접관 메모 · Q${state.results.indexOf(record) + 1} · 🪰 초파리 뇌 채점`),
           h('p', { class: 'memo-h' }, title)),
         stamp(`${ev.overall}`, '점', tier)),
-      h('div', { class: 'panel' }, scoreBars(ev.scores), deliveryTiles(analysis)),
+      h('div', { class: 'panel' }, scoreBars(ev.scores), deliveryTiles(record.analysis)),
       flyPanel(ev),
-      h('div', { class: 'panel' }, feedbackLists(ev)),
-      h('div', { class: 'actions' },
-        h('button', {
-          type: 'button',
-          class: 'btn btn-main btn-wide',
-          onclick: () => (next ? askQuestion({ ...next, reaction }) : finish()),
-        }, next ? '다음 질문' : '성적표 보기')),
+      h('div', { class: 'panel feedback-panel' }, feedbackBody(record)),
+      h('div', { class: 'actions' }, nextBtn),
     );
     sheet.hidden = false;
     sheet.scrollTop = 0;
     const cv = sheet.querySelector('canvas.fly-canvas');
     if (cv) FlyView.draw(cv, ev.fly);
-    sheet.querySelector('.actions .btn').focus({ preventScroll: true });
+    nextBtn.focus({ preventScroll: true });
   }
 
-  /** 초파리 뇌가 이 답변을 어떻게 봤는지: 그림 + 인식 결과 + 점수 피드백으로 가르치기 */
-  function flyPanel(ev) {
+  /** 피드백 칸: AI 선생님을 기다리는 중이면 안내를, 오면 AI 피드백을, 실패하면 기본 피드백을 보여 준다. */
+  function feedbackBody(record) {
+    const ev = record.evaluation;
+    if (record.aiPromise && !record.aiDone) {
+      return h('div', {},
+        h('p', { class: 'ai-wait' }, h('span', { class: 'dots' }), '✨ AI 선생님이 피드백을 쓰는 중… (점수는 이미 나왔어요)'),
+        feedbackLists(ev));
+    }
+    return h('div', {},
+      record.aiError ? h('p', { class: 'hint' }, `AI 선생님 연결이 안 돼서 기본 피드백을 보여 드려요. (${record.aiError})`) : '',
+      feedbackLists(ev));
+  }
+
+  /** AI 선생님 답이 도착하면, 지금 보고 있는 메모의 피드백·초파리 칸만 바꾼다. */
+  function refreshSheet(record) {
+    const sheet = $('#sheet');
+    if (sheet.hidden || sheet._record !== record) return;
+    const fb = sheet.querySelector('.feedback-panel');
+    if (fb) fb.replaceChildren(feedbackBody(record));
+    const notes = sheet.querySelector('.fly-notes');
+    if (notes) notes.replaceChildren(...flyNotes(record.evaluation));
+  }
+
+  function flyNotes(ev) {
     const f = ev.fly;
-    if (!f) return '';
     const notes = [
       h('li', {}, '답변 유형: ', h('b', {}, f.typeLabel), ` (확신 ${Math.round(f.typeConfidence * 100)}%)`),
       h('li', {}, `케년세포 ${FlyBrain.N_KC.toLocaleString()}개 중 ${f.active.length}개가 반응 · 익숙함 ${Math.round(f.familiarity * 100)}%`),
@@ -588,6 +650,13 @@
     if (ev.teacherOverall != null) {
       notes.push(h('li', {}, `✨ AI 선생님 점수 ${ev.teacherOverall}점 → 초파리가 보고 배웠어요 (배운 횟수 ${FlyBrain.stats().lessons}회)`));
     }
+    return notes;
+  }
+
+  /** 초파리 뇌가 이 답변을 어떻게 봤는지: 그림 + 인식 결과 + 점수 피드백으로 가르치기 */
+  function flyPanel(ev) {
+    const f = ev.fly;
+    if (!f) return '';
     const teach = (delta, label) => (e) => {
       const target = {};
       for (const [k, v] of Object.entries(ev.scores)) target[k] = v == null ? null : Math.max(0, Math.min(10, v + delta));
@@ -599,7 +668,7 @@
     return h('div', { class: 'panel fly' },
       h('h3', {}, '🪰 초파리 뇌가 본 이 답변'),
       h('canvas', { class: 'fly-canvas', role: 'img', 'aria-label': `초파리 뇌 활성 그림: 케년세포 ${f.active.length}개 반응` }),
-      h('ul', { class: 'fly-notes' }, notes),
+      h('ul', { class: 'fly-notes' }, flyNotes(ev)),
       h('div', { class: 'fly-teach' },
         h('span', {}, '이 점수 어때요?'),
         h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: teach(-1.5, '더 낮아야 해요') }, '더 낮게'),
