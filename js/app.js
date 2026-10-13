@@ -484,6 +484,7 @@
       stuffing: '키워드와 숫자만 늘어놓았어요. "상황 → 내가 한 일 → 결과"를 문장으로 이어서 말하세요.',
       empty: '다짐과 좋은 말뿐이고 실제로 한 일이 없어요. 경험 하나를 숫자와 함께 말해 보세요.',
       rambling: '군말이 많고 핵심이 안 보여요. 결론 한 문장부터 말한 뒤 이유를 붙이세요.',
+      tooShort: '답이 너무 짧아요. 결론 한 문장에 경험 하나(무엇을, 어떻게, 결과)를 붙여 30초 이상 말해 보세요.',
     };
     const tips = fly.alarms.filter((a) => a.level >= 0.5).map((a) => ALARM_TIPS[a.id]).filter(Boolean);
     evaluation.feedback_improve = tips.concat(evaluation.feedback_improve).slice(0, 4);
@@ -959,7 +960,7 @@
     const st = FlyBrain.stats();
     $('#fly-stats').textContent = st.lessons
       ? `지금까지 ${st.lessons}번 배웠고, 답변 ${st.memories}개를 기억하고 있어요.`
-      : '예시 답변 36개로 기본기를 익혔어요. 연습할수록 더 배워요.';
+      : '예시 답변 116개로 기본기를 익혔어요. 연습할수록 더 배워요.';
   }
 
   FlyBrain.init();
