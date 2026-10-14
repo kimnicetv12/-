@@ -7,6 +7,9 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local Debris = game:GetService("Debris")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config"))
 
 local player = Players.LocalPlayer
 
@@ -82,8 +85,38 @@ function Effects.PlayClick()
 	sounds.click:Play()
 end
 
+local RAINBOW = ColorSequence.new({
+	ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 80, 80)),
+	ColorSequenceKeypoint.new(0.33, Color3.fromRGB(255, 230, 80)),
+	ColorSequenceKeypoint.new(0.66, Color3.fromRGB(80, 220, 255)),
+	ColorSequenceKeypoint.new(1, Color3.fromRGB(200, 90, 255)),
+})
+
+-- 장착한 스킨 색과 꼬리(트레일)를 단 볼
+local function makeBall(skinId)
+	local skin = Config.FindById(Config.Skins, skinId) or Config.Skins[1]
+	local ball = ballTemplate:Clone()
+	ball.Color = skin.color
+	local a0 = Instance.new("Attachment")
+	a0.Position = Vector3.new(0, 0.5, 0)
+	a0.Parent = ball
+	local a1 = Instance.new("Attachment")
+	a1.Position = Vector3.new(0, -0.5, 0)
+	a1.Parent = ball
+	local trail = Instance.new("Trail")
+	trail.Attachment0 = a0
+	trail.Attachment1 = a1
+	trail.Lifetime = 0.25
+	trail.LightEmission = 1
+	trail.FaceCamera = true
+	trail.Color = skin.rainbow and RAINBOW or ColorSequence.new(skin.color)
+	trail.Transparency = NumberSequence.new(0.2, 1)
+	trail.Parent = ball
+	return ball, skin
+end
+
 -- 포물선을 그리며 날아가는 볼
-function Effects.Throw(from, to, onArrive)
+function Effects.Throw(from, to, skinId, onArrive)
 	if activeBalls >= MAX_BALLS then
 		if onArrive then
 			onArrive()
@@ -92,7 +125,7 @@ function Effects.Throw(from, to, onArrive)
 	end
 	activeBalls += 1
 
-	local ball = ballTemplate:Clone()
+	local ball, skin = makeBall(skinId)
 	ball.Position = from
 	ball.Parent = fxFolder
 
@@ -106,6 +139,9 @@ function Effects.Throw(from, to, onArrive)
 		local alpha = math.min(1, (os.clock() - startTime) / duration)
 		local position = from:Lerp(to, alpha) + Vector3.new(0, math.sin(alpha * math.pi) * arc, 0)
 		ball.CFrame = CFrame.new(position) * CFrame.Angles(alpha * 12, 0, 0)
+		if skin.rainbow then
+			ball.Color = Color3.fromHSV((os.clock() * 2) % 1, 0.8, 1)
+		end
 		if alpha >= 1 then
 			connection:Disconnect()
 			ball:Destroy()

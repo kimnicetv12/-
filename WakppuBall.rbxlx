@@ -11,55 +11,161 @@
         <Properties>
           <string name="Name">Config</string>
           <string name="Source"><![CDATA[--[[
-	게임 밸런스 설정
+	게임 밸런스 설정 (서버와 클라이언트가 함께 씁니다)
 	숫자를 바꾸고 다시 플레이(F5)하면 바로 적용됩니다.
-	서버와 클라이언트가 같은 공식을 쓰도록 ReplicatedStorage에 둡니다.
 ]]
 
 local Config = {}
 
 Config.GameName = "왁뿌볼 던지기"
 Config.BallName = "왁뿌볼"
-Config.WorldName = "월드 1 · 말랑 초원"
-Config.StagesPerWorld = 10
 
--- 던지기 -----------------------------------------------------------------
+-- 게임패스 --------------------------------------------------------------------
+-- 크리에이터 대시보드에서 게임패스를 만든 뒤 id에 번호를 넣으세요. 0이면 "준비 중"으로 표시됩니다.
+-- StudioOwnsAllPasses = true로 바꾸면 스튜디오 테스트에서만 모든 게임패스를 가진 것으로 취급합니다.
+Config.StudioOwnsAllPasses = false
 
-Config.BaseGain = 1 -- 던질 때마다 오르는 기본 속도
-Config.FreeAutoThrow = true -- false로 바꾸면 자동 던지기 버튼이 사라집니다 (나중에 게임패스로 팔 때)
-Config.ThrowRange = 55 -- 이 거리 안의 가장 가까운 적에게 던집니다
-Config.MaxThrowsPerSecond = 10 -- 공속 상한 (서버 부하 방지)
+Config.GamePasses = {
+	DoubleSpeed = { id = 0, name = "2배 속도", icon = "⚡", robux = 99, desc = "던질 때 얻는 속도 2배" },
+	AutoThrow = { id = 0, name = "자동 던지기", icon = "🤖", robux = 249, desc = "버튼 하나로 계속 던지기" },
+	DoubleTrophies = { id = 0, name = "2배 트로피", icon = "🏆", robux = 95, desc = "귀환할 때 받는 트로피 2배" },
+	DeathInsurance = { id = 0, name = "사망 보험", icon = "🛡️", robux = 149, desc = "죽어도 미수령 트로피 30% 보존" },
+	GoldDummy = { id = 0, name = "황금 허수아비", icon = "🥇", robux = 79, desc = "허수아비 훈련 x3" },
+	DiamondDummy = { id = 0, name = "다이아 허수아비", icon = "💎", robux = 345, desc = "허수아비 훈련 x9" },
+	CandyDummy = { id = 0, name = "캔디 허수아비", icon = "🍭", robux = 749, desc = "허수아비 훈련 x25" },
+	AdminDummy = { id = 0, name = "운영자 허수아비", icon = "👑", robux = 1199, desc = "허수아비 훈련 x100" },
+	GalaxyBall = { id = 0, name = "은하 왁뿌볼", icon = "🌌", robux = 295, desc = "속도 x10 스킨" },
+	ChocoBall = { id = 0, name = "초코 왁뿌볼", icon = "🍫", robux = 499, desc = "속도 x20 스킨" },
+	AdminBall = { id = 0, name = "운영자 왁뿌볼", icon = "👑", robux = 1799, desc = "속도 x100 스킨" },
+}
 
--- 공속: 처음엔 빠르게 오르고 뒤로 갈수록 완만해집니다 (소프트캡)
+-- 상점에 보여줄 게임패스 순서
+Config.PassOrder = {
+	"DoubleSpeed",
+	"AutoThrow",
+	"DoubleTrophies",
+	"DeathInsurance",
+	"GoldDummy",
+	"DiamondDummy",
+	"CandyDummy",
+	"AdminDummy",
+}
+
+Config.FreeAutoThrow = true -- false면 자동 던지기는 게임패스가 있어야 씁니다
+Config.DeathInsuranceKeep = 0.3
+
+-- 던지기 -----------------------------------------------------------------------
+
+Config.ThrowRange = 55
+Config.MaxThrowsPerSecond = 10
+
 function Config.ThrowsPerSecond(speed)
-	return math.min(Config.MaxThrowsPerSecond, 3 + 1.5 * math.log(1 + speed / 50, 2))
+	return math.min(Config.MaxThrowsPerSecond, 3 + 1.2 * math.log(1 + speed / 100, 2))
 end
 
--- 공격력: 속도가 오를수록 강해집니다
 function Config.Damage(speed)
 	return 1 + math.floor(speed / 20)
 end
 
--- 던질 때 얻는 속도 = (기본값 + 볼 강화) × 환생 배수
-function Config.GainPerThrow(data)
-	return (Config.BaseGain + data.BallUpgrade) * Config.RebirthMultiplier(data.Rebirths)
+-- 던지기 파워 발판 (로비의 숫자 발판). 밟으면 트로피로 구매, 던질 때 얻는 기본 속도가 됩니다.
+Config.Pads = {
+	{ value = 1, cost = 0 },
+	{ value = 2, cost = 3 },
+	{ value = 3, cost = 15 },
+	{ value = 5, cost = 60 },
+	{ value = 10, cost = 250 },
+	{ value = 25, cost = 1000 },
+	{ value = 50, cost = 4000 },
+	{ value = 100, cost = 15000 },
+	{ value = 250, cost = 60000 },
+	{ value = 500, cost = 200000 },
+}
+
+-- 왁뿌볼 스킨 (원작의 트레일). 하나만 장착, 속도 배수
+Config.Skins = {
+	{ id = "basic", name = "기본 왁뿌볼", rarity = 1, mult = 1, cost = 0, color = Color3.fromRGB(255, 130, 190) },
+	{ id = "green", name = "초록 왁뿌볼", rarity = 1, mult = 1.5, cost = 100, color = Color3.fromRGB(90, 220, 110) },
+	{ id = "sky", name = "하늘 왁뿌볼", rarity = 1, mult = 2, cost = 400, color = Color3.fromRGB(90, 180, 255) },
+	{ id = "purple", name = "보라 왁뿌볼", rarity = 2, mult = 3, cost = 1500, color = Color3.fromRGB(170, 90, 255) },
+	{ id = "fire", name = "불꽃 왁뿌볼", rarity = 2, mult = 4, cost = 6000, color = Color3.fromRGB(255, 90, 50) },
+	{ id = "rainbow", name = "무지개 왁뿌볼", rarity = 3, mult = 5, cost = 25000, color = Color3.fromRGB(255, 255, 255), rainbow = true },
+	{ id = "gold", name = "황금 왁뿌볼", rarity = 3, mult = 8, cost = 150000, color = Color3.fromRGB(255, 205, 60) },
+	{ id = "galaxy", name = "은하 왁뿌볼", rarity = 4, mult = 10, pass = "GalaxyBall", color = Color3.fromRGB(60, 40, 140) },
+	{ id = "choco", name = "초코 왁뿌볼", rarity = 4, mult = 20, pass = "ChocoBall", color = Color3.fromRGB(120, 70, 40) },
+	{ id = "admin", name = "운영자 왁뿌볼", rarity = 5, mult = 100, pass = "AdminBall", color = Color3.fromRGB(255, 40, 40), rainbow = true },
+	-- 월드 보스를 처음 잡으면 받는 전용 스킨
+	{ id = "crown1", name = "초원 왕관볼", rarity = 4, mult = 6, boss = 1, color = Color3.fromRGB(150, 255, 120) },
+	{ id = "crown2", name = "사탕 왕관볼", rarity = 4, mult = 15, boss = 2, color = Color3.fromRGB(255, 150, 220) },
+	{ id = "crown3", name = "별빛 왕관볼", rarity = 5, mult = 40, boss = 3, color = Color3.fromRGB(140, 220, 255) },
+}
+
+-- 오라. 스킨 배수 위에 곱해집니다
+Config.Auras = {
+	{ id = "sparkle", name = "반짝 오라", rarity = 2, mult = 1.2, cost = 20000, color = Color3.fromRGB(255, 255, 200) },
+	{ id = "water", name = "물결 오라", rarity = 3, mult = 2, cost = 150000, color = Color3.fromRGB(80, 170, 255) },
+	{ id = "flame", name = "화염 오라", rarity = 4, mult = 3, cost = 800000, color = Color3.fromRGB(255, 110, 40) },
+	{ id = "thunder", name = "번개 오라", rarity = 5, mult = 5, cost = 5000000, color = Color3.fromRGB(255, 240, 80) },
+}
+
+Config.Rarities = {
+	{ name = "일반", color = Color3.fromRGB(180, 180, 190) },
+	{ name = "희귀", color = Color3.fromRGB(80, 170, 255) },
+	{ name = "영웅", color = Color3.fromRGB(190, 90, 255) },
+	{ name = "전설", color = Color3.fromRGB(255, 180, 40) },
+	{ name = "신화", color = Color3.fromRGB(255, 70, 90) },
+}
+
+-- 훈련 허수아비 (원작의 트레드밀). 노란 원 안에 서 있으면 자동으로 던집니다
+Config.Dummies = {
+	{ name = "나무 허수아비", mult = 1, color = Color3.fromRGB(200, 160, 110) },
+	{ name = "황금 허수아비", mult = 3, pass = "GoldDummy", color = Color3.fromRGB(255, 205, 60) },
+	{ name = "다이아 허수아비", mult = 9, pass = "DiamondDummy", color = Color3.fromRGB(120, 230, 255) },
+	{ name = "캔디 허수아비", mult = 25, pass = "CandyDummy", color = Color3.fromRGB(255, 140, 210) },
+	{ name = "운영자 허수아비", mult = 100, pass = "AdminDummy", color = Color3.fromRGB(255, 70, 70) },
+}
+Config.DummyRange = 8
+Config.DummyThrowsPerSecond = 2
+
+function Config.FindById(list, id)
+	for _, item in ipairs(list) do
+		if item.id == id then
+			return item
+		end
+	end
+	return nil
 end
 
--- 레벨 -------------------------------------------------------------------
+-- 던질 때 얻는 속도 = 발판 파워 × 환생 × 스킨 × 오라 × 2배 패스 × 운영자 이벤트
+-- ctx = { pad, rebirths, skin, aura, doubleSpeed, eventMult }
+function Config.SpeedMultiplier(ctx)
+	local skin = Config.FindById(Config.Skins, ctx.skin)
+	local aura = Config.FindById(Config.Auras, ctx.aura)
+	return Config.RebirthMultiplier(ctx.rebirths)
+		* (skin and skin.mult or 1)
+		* (aura and aura.mult or 1)
+		* (ctx.doubleSpeed and 2 or 1)
+		* (ctx.eventMult or 1)
+end
 
--- 레벨 L이 되려면 필요한 속도
+function Config.GainPerThrow(ctx)
+	local pad = Config.Pads[ctx.pad] or Config.Pads[1]
+	return pad.value * Config.SpeedMultiplier(ctx)
+end
+
+-- 레벨 ------------------------------------------------------------------------
+
 function Config.SpeedForLevel(level)
 	if level <= 1 then
 		return 0
 	end
-	return math.floor(15 * (level - 1) ^ 1.6)
+	return math.floor(10 * (level - 1) ^ 2.5)
 end
 
 function Config.LevelFromSpeed(speed)
 	if speed <= 0 then
 		return 1
 	end
-	local level = math.max(1, math.floor((speed / 15) ^ (1 / 1.6)) + 1)
+	local level = math.max(1, math.floor((speed / 10) ^ (1 / 2.5)) + 1)
 	while level > 1 and Config.SpeedForLevel(level) > speed do
 		level -= 1
 	end
@@ -74,129 +180,146 @@ function Config.MaxHealth(level)
 end
 
 function Config.WalkSpeed(level)
-	return math.min(30, 16 + level * 0.5)
+	return math.min(32, 16 + level * 0.1)
 end
 
--- 볼 강화 (트로피로 구매) -------------------------------------------------
+-- 환생 ------------------------------------------------------------------------
+-- n번째 환생에 필요한 레벨과, n번 환생했을 때의 속도 배수
 
-function Config.UpgradeCost(upgradeLevel)
-	return math.floor(10 * 1.6 ^ upgradeLevel)
-end
-
--- 환생 -------------------------------------------------------------------
+local REBIRTH_LEVELS = { 15, 25, 40, 55, 75, 100, 130, 160, 200, 250, 300, 380, 460, 540, 600 }
+local REBIRTH_MULTS = { 1.5, 2, 2.5, 3, 3.5, 5, 6.5, 8, 10, 15, 25, 50, 100, 250, 500 }
 
 function Config.RebirthLevel(rebirths)
-	return 15 + rebirths * 10
+	local nextRebirth = rebirths + 1
+	if REBIRTH_LEVELS[nextRebirth] then
+		return REBIRTH_LEVELS[nextRebirth]
+	end
+	return REBIRTH_LEVELS[#REBIRTH_LEVELS] + (nextRebirth - #REBIRTH_LEVELS) * 80
 end
 
 function Config.RebirthMultiplier(rebirths)
-	return 1 + rebirths
+	if rebirths <= 0 then
+		return 1
+	end
+	if REBIRTH_MULTS[rebirths] then
+		return REBIRTH_MULTS[rebirths]
+	end
+	return REBIRTH_MULTS[#REBIRTH_MULTS] * 2 ^ (rebirths - #REBIRTH_MULTS)
 end
 
--- 훈련 허수아비 ------------------------------------------------------------
+-- 월드와 스테이지 ---------------------------------------------------------------
 
-Config.DummyRange = 12 -- 이 거리 안에 서 있으면 자동으로 던집니다
-Config.DummyThrowsPerSecond = 1.5
-Config.DummyMultiplier = 1 -- 상위 단계(유료)는 이 배수를 올리면 됩니다
+Config.StagesPerWorld = 13
+Config.TargetStageSeconds = 15 -- 권장 레벨이면 한 스테이지 적을 이 시간 안에 처치
 
--- 스테이지 ----------------------------------------------------------------
-
-function Config.StageReward(stage)
-	return math.ceil(3 * stage ^ 1.5)
-end
-
-function Config.EnemyCount(stage)
-	return 3 + math.floor((stage - 1) * 0.7)
-end
-
-function Config.EnemyHealth(stage)
-	return math.floor(6 * 1.6 ^ (stage - 1))
-end
-
-function Config.EnemyDamage(stage)
-	return 10 + (stage - 1) * 4
-end
-
-function Config.PathLength(stage)
-	return math.min(400, 150 + stage * 12)
-end
-
--- 깊이 갈수록 길이 좁아집니다
-function Config.PathWidth(stage)
-	return math.max(12, 34 - stage * 2)
-end
-
-Config.EnemyAggroRange = 70 -- 이 거리 안에 들어오면 쫓아옵니다
-Config.EnemyAttackCooldown = 1 -- 초
-
-Config.EnemyTypes = {
+Config.Worlds = {
 	{
-		id = "Slime",
-		name = "말랑이",
-		minStage = 1,
-		weight = 5,
-		health = 1,
-		speed = 7,
-		damage = 1,
-		size = 4,
-		shape = "Ball",
-		color = Color3.fromRGB(120, 220, 120),
+		name = "말랑 초원",
+		level = 1,
+		recommended = { 1, 100 }, -- 1스테이지, 마지막 스테이지 권장 레벨
+		rewardMult = 1,
+		keyColors = { Color3.fromRGB(245, 245, 250), Color3.fromRGB(205, 235, 200) },
+		dangerColor = Color3.fromRGB(255, 160, 140),
+		enemyNames = { "말랑이", "재빠름이", "단단이" },
+		bossName = "왕말랑이",
+		bossColor = Color3.fromRGB(90, 200, 90),
 	},
 	{
-		id = "Runner",
-		name = "재빠름이",
-		minStage = 3,
-		weight = 3,
-		health = 0.6,
-		speed = 15,
-		damage = 0.7,
-		size = 3,
-		shape = "Ball",
-		color = Color3.fromRGB(255, 210, 70),
+		name = "사탕 왕국",
+		level = 120,
+		recommended = { 120, 380 },
+		rewardMult = 500,
+		keyColors = { Color3.fromRGB(255, 225, 240), Color3.fromRGB(200, 150, 110) },
+		dangerColor = Color3.fromRGB(255, 90, 160),
+		enemyNames = { "젤리곰", "솜사탕", "초코벽돌" },
+		bossName = "거대 곰젤리",
+		bossColor = Color3.fromRGB(255, 120, 190),
 	},
 	{
-		id = "Brute",
-		name = "단단이",
-		minStage = 5,
-		weight = 2,
-		health = 3,
-		speed = 4.5,
-		damage = 2,
-		size = 7,
-		shape = "Block",
-		color = Color3.fromRGB(230, 90, 90),
+		name = "별빛 우주",
+		level = 400,
+		recommended = { 400, 840 },
+		rewardMult = 250000,
+		keyColors = { Color3.fromRGB(60, 60, 90), Color3.fromRGB(110, 90, 170) },
+		dangerColor = Color3.fromRGB(150, 90, 255),
+		enemyNames = { "별똥이", "유성", "블랙홀" },
+		bossName = "은하 대왕",
+		bossColor = Color3.fromRGB(120, 90, 255),
 	},
 }
 
--- 권장 레벨: 평균 스펙으로 한 스테이지를 이 시간 안에 깰 수 있는 레벨
-Config.TargetStageSeconds = 30
-
-local recommendedCache = {}
-
-function Config.RecommendedLevel(stage)
-	if recommendedCache[stage] then
-		return recommendedCache[stage]
-	end
-	local totalHealth = Config.EnemyCount(stage) * Config.EnemyHealth(stage) * 1.5
-	local function fastEnough(speed)
-		return totalHealth / (Config.Damage(speed) * Config.ThrowsPerSecond(speed)) <= Config.TargetStageSeconds
-	end
-	local low, high = 0, 1
-	while not fastEnough(high) and high < 1e15 do
-		high *= 2
-	end
-	for _ = 1, 60 do
-		local mid = (low + high) / 2
-		if fastEnough(mid) then
-			high = mid
-		else
-			low = mid
-		end
-	end
-	local level = Config.LevelFromSpeed(high)
-	recommendedCache[stage] = level
-	return level
+function Config.RecommendedLevel(world, stage)
+	local range = Config.Worlds[world].recommended
+	local t = (stage - 1) / math.max(1, Config.StagesPerWorld - 1)
+	return math.max(1, math.floor(range[1] * (range[2] / range[1]) ^ t + 0.5))
 end
+
+function Config.StageReward(world, stage)
+	return math.ceil(3 * 1.9 ^ (stage - 1) * Config.Worlds[world].rewardMult)
+end
+
+-- 이 스테이지로 바로 텔레포트하는 비용 (트로피)
+function Config.TeleportCost(world, stage)
+	if stage <= 1 then
+		return 0
+	end
+	return math.ceil(Config.StageReward(world, stage - 1) * 1.5)
+end
+
+function Config.EnemyCount(_world, stage)
+	return 3 + math.floor((stage - 1) * 0.6)
+end
+
+-- 적 체력은 "권장 레벨의 공격력으로 TargetStageSeconds 안에 전멸"이 되도록 계산합니다
+function Config.EnemyHealth(world, stage)
+	local speed = Config.SpeedForLevel(Config.RecommendedLevel(world, stage))
+	local dps = Config.Damage(speed) * Config.ThrowsPerSecond(speed)
+	local total = dps * Config.TargetStageSeconds
+	return math.max(3, math.floor(total / (Config.EnemyCount(world, stage) * 1.3)))
+end
+
+function Config.EnemyDamage(world, stage)
+	return math.ceil(Config.MaxHealth(Config.RecommendedLevel(world, stage)) * 0.12)
+end
+
+function Config.PathLength(stage)
+	return math.min(320, 140 + stage * 12)
+end
+
+function Config.PathWidth(stage)
+	return math.max(12, 32 - stage * 1.6)
+end
+
+-- 깊은 스테이지일수록 키보드 사이 구멍(점프 구간)이 늘어납니다
+function Config.GapCount(stage)
+	return math.floor(stage / 3)
+end
+
+Config.EnemyAggroRange = 70
+Config.EnemyAttackCooldown = 1
+
+-- 적 종류 (이름은 월드마다 다름: Config.Worlds[n].enemyNames)
+Config.EnemyTypes = {
+	{ id = "Slime", minStage = 1, weight = 5, health = 1, speed = 7, damage = 1, size = 4, shape = "Ball", color = Color3.fromRGB(120, 220, 120) },
+	{ id = "Runner", minStage = 3, weight = 3, health = 0.6, speed = 15, damage = 0.7, size = 3, shape = "Ball", color = Color3.fromRGB(255, 210, 70) },
+	{ id = "Brute", minStage = 5, weight = 2, health = 3, speed = 4.5, damage = 2, size = 7, shape = "Block", color = Color3.fromRGB(230, 90, 90) },
+}
+
+Config.Boss = { health = 12, damage = 2, speed = 5, size = 13 }
+
+-- 무료 보상 ---------------------------------------------------------------------
+
+Config.GiftCooldown = 4 * 60 * 60 -- 무료 선물 상자 (4시간마다)
+Config.GiftThrows = 400 -- 선물 = 지금 던지기 400번 분량의 속도
+
+-- 코드 (대문자로 적으세요)
+Config.Codes = {
+	WAKPPU = { speed = 1000, text = "속도 +1,000" },
+	RELEASE = { trophies = 50, text = "트로피 +50" },
+}
+
+-- 운영자 이벤트: 채팅에 /event 10 30 (속도 10배, 30분) · /event off
+Config.Admins = {} -- 운영자 UserId 목록 (게임 주인과 스튜디오는 자동으로 운영자)
 
 return Config
 ]]></string>
@@ -256,40 +379,60 @@ local DataStoreService = game:GetService("DataStoreService")
 
 local Data = {}
 
--- 저장되는 값들 (미수령 트로피는 저장하지 않습니다: 나가면 사라짐)
-Data.Keys = { "Speed", "Trophies", "BallUpgrade", "Rebirths", "BestStage" }
-
+-- 저장되는 값과 기본값 (미수령 트로피는 저장하지 않습니다)
 local DEFAULTS = {
 	Speed = 0,
 	Trophies = 0,
-	BallUpgrade = 0,
+	Pad = 1, -- 구매한 가장 높은 던지기 파워 발판 번호
 	Rebirths = 0,
-	BestStage = 0,
+	BestStages = { 0, 0, 0 }, -- 월드별 최고 클리어 스테이지
+	Skins = { basic = true },
+	Skin = "basic",
+	Auras = {},
+	Aura = "",
+	Codes = {},
+	LastGift = 0,
 }
 
-local STORE_NAME = "WakppuBall_v1"
+local STORE_NAME = "WakppuBall_v2"
 
-local store
+local store, topStore
 do
-	local ok, result = pcall(function()
-		return DataStoreService:GetDataStore(STORE_NAME)
+	local ok, err = pcall(function()
+		store = DataStoreService:GetDataStore(STORE_NAME)
+		topStore = DataStoreService:GetOrderedDataStore("TopSpeed_v2")
 	end)
-	if ok then
-		store = result
-	else
-		warn("[저장] DataStore를 쓸 수 없어서 이번 세션은 저장하지 않아요: " .. tostring(result))
+	if not ok then
+		store, topStore = nil, nil
+		warn("[저장] DataStore를 쓸 수 없어서 이번 세션은 저장하지 않아요: " .. tostring(err))
 	end
 end
 
--- 불러오기에 실패한 플레이어는 저장도 막아서, 기존 데이터를 빈 값으로 덮어쓰지 않게 합니다
+Data.TopStore = topStore
+
 local canSave = {}
 
 local function keyFor(player)
 	return "player_" .. player.UserId
 end
 
+local function deepCopy(value)
+	if type(value) ~= "table" then
+		return value
+	end
+	local copy = {}
+	for k, v in pairs(value) do
+		copy[k] = deepCopy(v)
+	end
+	return copy
+end
+
+function Data.Defaults()
+	return deepCopy(DEFAULTS)
+end
+
 function Data.Load(player)
-	local data = table.clone(DEFAULTS)
+	local data = deepCopy(DEFAULTS)
 	if not store then
 		return data
 	end
@@ -313,11 +456,16 @@ function Data.Load(player)
 	end
 
 	if type(saved) == "table" then
-		for _, key in ipairs(Data.Keys) do
-			if type(saved[key]) == "number" then
+		for key, default in pairs(DEFAULTS) do
+			if type(saved[key]) == type(default) then
 				data[key] = saved[key]
 			end
 		end
+		-- 월드가 늘어나도 칸이 모자라지 않게
+		for i = 1, #DEFAULTS.BestStages do
+			data.BestStages[i] = tonumber(data.BestStages[i]) or 0
+		end
+		data.Skins.basic = true
 	end
 	canSave[player] = true
 	return data
@@ -328,7 +476,7 @@ function Data.Save(player, data)
 		return
 	end
 	local payload = {}
-	for _, key in ipairs(Data.Keys) do
+	for key in pairs(DEFAULTS) do
 		payload[key] = data[key]
 	end
 	local ok, err = pcall(function()
@@ -336,6 +484,11 @@ function Data.Save(player, data)
 	end)
 	if not ok then
 		warn("[저장] " .. player.Name .. " 저장 실패: " .. tostring(err))
+	end
+	if topStore then
+		pcall(function()
+			topStore:SetAsync(tostring(player.UserId), math.floor(math.min(data.Speed, 2 ^ 52)))
+		end)
 	end
 end
 
@@ -353,23 +506,27 @@ return Data
           <token name="RunContext">0</token>
           <string name="Source"><![CDATA[--[[
 	왁뿌볼 던지기 — 서버
-	던지기 → 속도 +1 → 적 처치 → 출구에서 귀환(Stop) / 전진(Go) → 죽으면 미수령 트로피 전부 상실
+	던지기 → 속도 → 적 처치 → 안전지대에서 귀환(노란 발판) / 전진(초록 포털) → 죽으면 미수령 트로피 상실
 ]]
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local HttpService = game:GetService("HttpService")
+local MessagingService = game:GetService("MessagingService")
 local Lighting = game:GetService("Lighting")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared:WaitForChild("Config"))
+local Format = require(Shared:WaitForChild("Format"))
 local World = require(script.Parent:WaitForChild("World"))
 local Data = require(script.Parent:WaitForChild("Data"))
+local Passes = require(script.Parent:WaitForChild("Passes"))
 
 Players.RespawnTime = 3
 Lighting.ClockTime = 14
 
--- 서버 ↔ 클라이언트 통신 -----------------------------------------------------
+-- 서버 ↔ 클라이언트 통신 ----------------------------------------------------------
 
 local remotes = Instance.new("Folder")
 remotes.Name = "Remotes"
@@ -382,35 +539,66 @@ local function newRemote(name)
 end
 
 local ThrowRemote = newRemote("Throw") -- 클라 → 서버: 던지기
-local ActionRemote = newRemote("Action") -- 클라 → 서버: 귀환/전진, 강화, 환생
+local ActionRemote = newRemote("Action") -- 클라 → 서버: 상점, 환생, 텔레포트, 코드, 선물
 local ThrowFx = newRemote("ThrowFx") -- 서버 → 모두: 볼 날아가는 연출
-local Notify = newRemote("Notify") -- 서버 → 클라: 레벨업, 클리어, 사망 등
+local Notify = newRemote("Notify") -- 서버 → 클라: 알림
 remotes.Parent = ReplicatedStorage
+
+workspace:SetAttribute("EventMult", 1)
+workspace:SetAttribute("EventEnds", 0)
 
 local lobby = World.BuildLobby()
 
-local states = {} -- [player] = { data, lastThrow, run }
+local states = {} -- [player] = { data, lastThrow, run, cooldowns }
 local slots = {} -- 스테이지를 지을 자리 [번호] = player
 
--- 값 바꾸기: 상태 + 플레이어 속성 + 리더보드를 한 번에 맞춥니다 ------------------
+-- 상태 동기화 -----------------------------------------------------------------------
 
-local LEADERSTATS = {
-	Trophies = "트로피",
-	Level = "레벨",
-	BestStage = "최고 스테이지",
-}
+local function updateLeaderstats(player, state)
+	local leaderstats = player:FindFirstChild("leaderstats")
+	if not leaderstats then
+		return
+	end
+	leaderstats["⚡ 속도"].Value = Format.Short(state.data.Speed)
+	leaderstats["🏆 트로피"].Value = Format.Short(state.data.Trophies)
+	leaderstats["🔁 환생"].Value = state.data.Rebirths
+end
 
+-- 숫자/문자 값: 상태와 플레이어 속성을 함께 바꿉니다
 local function set(player, state, key, value)
 	state.data[key] = value
 	player:SetAttribute(key, value)
-	local statName = LEADERSTATS[key]
-	if statName then
-		local leaderstats = player:FindFirstChild("leaderstats")
-		local stat = leaderstats and leaderstats:FindFirstChild(statName)
-		if stat then
-			stat.Value = math.min(value, 2 ^ 53)
-		end
+	if key == "Speed" or key == "Trophies" or key == "Rebirths" then
+		updateLeaderstats(player, state)
 	end
+end
+
+-- 표(목록) 값: JSON 글자로 바꿔서 속성에 넣습니다 (예: SkinsJson)
+local function syncTable(player, state, key)
+	player:SetAttribute(key .. "Json", HttpService:JSONEncode(state.data[key]))
+end
+
+local function syncPasses(player)
+	player:SetAttribute("PassesJson", HttpService:JSONEncode(Passes.Get(player)))
+end
+
+local function eventMultiplier()
+	if workspace:GetAttribute("EventEnds") > os.time() then
+		return workspace:GetAttribute("EventMult")
+	end
+	return 1
+end
+
+local function speedContext(player, state)
+	local data = state.data
+	return {
+		pad = data.Pad,
+		rebirths = data.Rebirths,
+		skin = data.Skin,
+		aura = data.Aura,
+		doubleSpeed = Passes.Owns(player, "DoubleSpeed"),
+		eventMult = eventMultiplier(),
+	}
 end
 
 local function getCharacterParts(player)
@@ -429,6 +617,20 @@ end
 local function toast(player, text, color)
 	Notify:FireClient(player, "toast", { text = text, color = color })
 end
+
+-- 같은 일이 너무 자주 일어나지 않게 (발판 위에 서 있을 때 알림이 쏟아지는 것 방지)
+local function ready(state, key, seconds)
+	local now = os.clock()
+	if (state.cooldowns[key] or 0) > now then
+		return false
+	end
+	state.cooldowns[key] = now + seconds
+	return true
+end
+
+local RED = Color3.fromRGB(255, 120, 120)
+local GOLD = Color3.fromRGB(255, 214, 90)
+local CYAN = Color3.fromRGB(120, 230, 255)
 
 local function applyLevelStats(player, state)
 	local character = player.Character
@@ -455,7 +657,35 @@ local function addSpeed(player, state, amount)
 	end
 end
 
--- 스테이지 진행 ---------------------------------------------------------------
+-- 오라: 캐릭터 주변에 반짝이는 입자
+local function applyAura(player, state)
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	if not root then
+		return
+	end
+	local old = root:FindFirstChild("AuraFx")
+	if old then
+		old:Destroy()
+	end
+	local aura = Config.FindById(Config.Auras, state.data.Aura)
+	if not aura then
+		return
+	end
+	local emitter = Instance.new("ParticleEmitter")
+	emitter.Name = "AuraFx"
+	emitter.Color = ColorSequence.new(aura.color)
+	emitter.LightEmission = 1
+	emitter.Rate = 25
+	emitter.Lifetime = NumberRange.new(0.8, 1.4)
+	emitter.Speed = NumberRange.new(1.5, 3)
+	emitter.SpreadAngle = Vector2.new(180, 180)
+	emitter.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.6), NumberSequenceKeypoint.new(1, 0) })
+	emitter.Transparency = NumberSequence.new(0.2)
+	emitter.Parent = root
+end
+
+-- 스테이지 진행 -----------------------------------------------------------------------
 
 local function teleport(player, cframe)
 	local character = player.Character
@@ -476,73 +706,79 @@ local function clearRun(player, state)
 		run.map.folder:Destroy()
 	end
 	slots[run.slot] = nil
+	-- Stage를 먼저 0으로: 화면은 Stage > 0일 때만 World를 읽습니다
 	set(player, state, "Stage", 0)
+	set(player, state, "World", 0)
 	set(player, state, "EnemiesLeft", 0)
+end
+
+local function bankAndReturn(player, state)
+	local amount = state.data.Unbanked
+	if Passes.Owns(player, "DoubleTrophies") then
+		amount *= 2
+	end
+	set(player, state, "Trophies", state.data.Trophies + amount)
+	set(player, state, "Unbanked", 0)
+	clearRun(player, state)
+	teleport(player, lobby.spawnCFrame)
+	Notify:FireClient(player, "banked", { amount = amount })
 end
 
 local buildStage
 
-local function onExitTouched(player, run, stage, hit)
+local function onSafeZoneTouched(player, run, stage, hit, goNext)
 	local state = states[player]
 	local character = player.Character
 	if not state or state.run ~= run or not run.map or run.map.stage ~= stage then
 		return
 	end
-	if not character or not hit:IsDescendantOf(character) then
+	if not character or not hit:IsDescendantOf(character) or not run.exitOpen or run.leaving then
 		return
 	end
-	if not run.exitOpen or run.awaitingChoice then
-		return
+	run.leaving = true
+	if goNext then
+		buildStage(player, state, run.map.world, stage + 1)
+	else
+		bankAndReturn(player, state)
 	end
-	run.awaitingChoice = true
-
-	local reward = Config.StageReward(stage)
-	set(player, state, "Unbanked", state.data.Unbanked + reward)
-	if stage > state.data.BestStage then
-		set(player, state, "BestStage", stage)
-	end
-
-	local canGo = stage < Config.StagesPerWorld
-	Notify:FireClient(player, "cleared", {
-		stage = stage,
-		reward = reward,
-		unbanked = state.data.Unbanked,
-		canGo = canGo,
-		nextStage = canGo and stage + 1 or nil,
-		nextRecommended = canGo and Config.RecommendedLevel(stage + 1) or nil,
-	})
 end
 
-function buildStage(player, state, stage)
+function buildStage(player, state, world, stage)
 	local run = state.run
 	if run.map then
 		run.map.folder:Destroy()
 	end
-	local map = World.BuildStage(run.origin, stage, player.Name)
+	local map = World.BuildStage(run.origin, world, stage, player.Name)
 	run.map = map
 	run.alive = #map.enemies
 	run.exitOpen = false
-	run.awaitingChoice = false
+	run.leaving = false
 
-	map.exitPad.Touched:Connect(function(hit)
-		onExitTouched(player, run, stage, hit)
+	map.bankPad.Touched:Connect(function(hit)
+		onSafeZoneTouched(player, run, stage, hit, false)
 	end)
+	if map.nextPortal then
+		map.nextPortal.Touched:Connect(function(hit)
+			onSafeZoneTouched(player, run, stage, hit, true)
+		end)
+	end
 
+	set(player, state, "World", world)
 	set(player, state, "Stage", stage)
 	set(player, state, "EnemiesLeft", run.alive)
 	teleport(player, map.startCFrame)
 	Notify:FireClient(player, "stageStart", {
+		world = world,
 		stage = stage,
-		recommended = Config.RecommendedLevel(stage),
+		recommended = Config.RecommendedLevel(world, stage),
 	})
 end
 
-local function startRun(player, state)
+local function startRun(player, state, world, stage)
 	if state.run then
 		return
 	end
-	local root = getCharacterParts(player)
-	if not root then
+	if not getCharacterParts(player) then
 		return
 	end
 	local slot = 1
@@ -550,21 +786,43 @@ local function startRun(player, state)
 		slot += 1
 	end
 	slots[slot] = player
-	state.run = {
-		slot = slot,
-		origin = Vector3.new(slot * 1000, 300, 0),
-	}
+	state.run = { slot = slot, origin = Vector3.new(slot * 1000, 300, 0) }
 	set(player, state, "Unbanked", 0)
-	buildStage(player, state, 1)
+	buildStage(player, state, world, stage)
 end
 
-local function bankAndReturn(player, state)
-	local amount = state.data.Unbanked
-	set(player, state, "Trophies", state.data.Trophies + amount)
-	set(player, state, "Unbanked", 0)
-	clearRun(player, state)
-	teleport(player, lobby.spawnCFrame)
-	Notify:FireClient(player, "banked", { amount = amount })
+local function onStageCleared(player, state)
+	local run = state.run
+	local world, stage = run.map.world, run.map.stage
+	run.exitOpen = true
+
+	local reward = Config.StageReward(world, stage)
+	set(player, state, "Unbanked", state.data.Unbanked + reward)
+	if stage > state.data.BestStages[world] then
+		state.data.BestStages[world] = stage
+		syncTable(player, state, "BestStages")
+	end
+
+	local isLast = stage >= Config.StagesPerWorld
+	Notify:FireClient(player, "cleared", {
+		world = world,
+		stage = stage,
+		reward = reward,
+		unbanked = state.data.Unbanked,
+		isLast = isLast,
+		nextRecommended = not isLast and Config.RecommendedLevel(world, stage + 1) or nil,
+	})
+
+	-- 월드 보스를 처음 잡으면 전용 스킨
+	if isLast then
+		for _, skin in ipairs(Config.Skins) do
+			if skin.boss == world and not state.data.Skins[skin.id] then
+				state.data.Skins[skin.id] = true
+				syncTable(player, state, "Skins")
+				Notify:FireClient(player, "newSkin", { id = skin.id, name = skin.name, mult = skin.mult })
+			end
+		end
+	end
 end
 
 local function onDied(player)
@@ -573,13 +831,18 @@ local function onDied(player)
 		return
 	end
 	local lost = state.data.Unbanked
+	local kept = 0
+	if Passes.Owns(player, "DeathInsurance") then
+		kept = math.floor(lost * Config.DeathInsuranceKeep)
+		set(player, state, "Trophies", state.data.Trophies + kept)
+	end
 	local stage = state.run.map and state.run.map.stage or 0
 	set(player, state, "Unbanked", 0)
 	clearRun(player, state)
-	Notify:FireClient(player, "death", { lost = lost, stage = stage })
+	Notify:FireClient(player, "death", { lost = lost - kept, kept = kept, stage = stage })
 end
 
--- 던지기 ---------------------------------------------------------------------
+-- 던지기 --------------------------------------------------------------------------
 
 local function findTarget(run, position)
 	if not run or not run.map then
@@ -610,8 +873,7 @@ local function damageEnemy(player, state, enemy, damage)
 	set(player, state, "EnemiesLeft", run.alive)
 	World.UpdateGate(run.map, run.alive)
 	if run.alive <= 0 then
-		run.exitOpen = true
-		Notify:FireClient(player, "exitOpen", {})
+		onStageCleared(player, state)
 	end
 end
 
@@ -625,7 +887,7 @@ ThrowRemote.OnServerEvent:Connect(function(player)
 		return
 	end
 
-	-- 공속보다 빠른 요청은 무시 (오토클릭/해킹 방지)
+	-- 공속보다 빠른 요청은 무시 (오토클릭 방지)
 	local now = os.clock()
 	local interval = 1 / Config.ThrowsPerSecond(state.data.Speed)
 	if now - state.lastThrow < interval * 0.85 then
@@ -633,83 +895,313 @@ ThrowRemote.OnServerEvent:Connect(function(player)
 	end
 	state.lastThrow = now
 
-	local gain = Config.GainPerThrow(state.data)
+	local gain = Config.GainPerThrow(speedContext(player, state))
 	addSpeed(player, state, gain)
 
 	local from = root.Position + Vector3.new(0, 1.5, 0)
 	local target = findTarget(state.run, root.Position)
 	if target then
 		local damage = Config.Damage(state.data.Speed)
-		ThrowFx:FireAllClients(player, from, target.part.Position, damage, gain)
+		ThrowFx:FireAllClients(player, from, target.part.Position, damage, gain, state.data.Skin)
 		damageEnemy(player, state, target, damage)
 	else
 		local landing = from + root.CFrame.LookVector * 30 - Vector3.new(0, 3, 0)
-		ThrowFx:FireAllClients(player, from, landing, nil, gain)
+		ThrowFx:FireAllClients(player, from, landing, nil, gain, state.data.Skin)
 	end
 end)
 
-ActionRemote.OnServerEvent:Connect(function(player, action, arg)
-	local state = states[player]
-	if not state or type(action) ~= "string" then
+-- 상점·환생·텔레포트·코드·선물 ---------------------------------------------------------------
+
+local function ownsSkin(player, state, skin)
+	return skin.id == "basic" or state.data.Skins[skin.id] == true or Passes.Owns(player, skin.pass)
+end
+
+local function equipBest(player, state)
+	local bestSkin, bestAura = Config.Skins[1], nil
+	for _, skin in ipairs(Config.Skins) do
+		if ownsSkin(player, state, skin) and skin.mult > bestSkin.mult then
+			bestSkin = skin
+		end
+	end
+	for _, aura in ipairs(Config.Auras) do
+		if state.data.Auras[aura.id] and (not bestAura or aura.mult > bestAura.mult) then
+			bestAura = aura
+		end
+	end
+	set(player, state, "Skin", bestSkin.id)
+	set(player, state, "Aura", bestAura and bestAura.id or "")
+	applyAura(player, state)
+end
+
+local actions = {}
+
+function actions.buySkin(player, state, id)
+	local skin = Config.FindById(Config.Skins, id)
+	if not skin or ownsSkin(player, state, skin) then
 		return
 	end
-	local data = state.data
+	if skin.pass then
+		local ok, reason = Passes.Prompt(player, skin.pass)
+		if not ok then
+			toast(player, reason, RED)
+		end
+		return
+	end
+	if skin.boss then
+		toast(player, "월드 " .. skin.boss .. " 보스를 쓰러뜨리면 얻을 수 있어요", RED)
+		return
+	end
+	if state.data.Trophies < skin.cost then
+		toast(player, "🏆 트로피가 부족해요", RED)
+		return
+	end
+	set(player, state, "Trophies", state.data.Trophies - skin.cost)
+	state.data.Skins[skin.id] = true
+	syncTable(player, state, "Skins")
+	set(player, state, "Skin", skin.id)
+	Notify:FireClient(player, "newSkin", { id = skin.id, name = skin.name, mult = skin.mult })
+end
 
-	if action == "choice" then
-		local run = state.run
-		if not run or not run.awaitingChoice then
-			return
+function actions.equipSkin(player, state, id)
+	local skin = Config.FindById(Config.Skins, id)
+	if skin and ownsSkin(player, state, skin) then
+		set(player, state, "Skin", skin.id)
+	end
+end
+
+function actions.buyAura(player, state, id)
+	local aura = Config.FindById(Config.Auras, id)
+	if not aura or state.data.Auras[aura.id] then
+		return
+	end
+	if state.data.Trophies < aura.cost then
+		toast(player, "🏆 트로피가 부족해요", RED)
+		return
+	end
+	set(player, state, "Trophies", state.data.Trophies - aura.cost)
+	state.data.Auras[aura.id] = true
+	syncTable(player, state, "Auras")
+	set(player, state, "Aura", aura.id)
+	applyAura(player, state)
+	toast(player, "✨ " .. aura.name .. " 획득! 속도 x" .. aura.mult, GOLD)
+end
+
+function actions.equipAura(player, state, id)
+	if id == "" or (Config.FindById(Config.Auras, id) and state.data.Auras[id]) then
+		set(player, state, "Aura", id)
+		applyAura(player, state)
+	end
+end
+
+function actions.equipBest(player, state)
+	equipBest(player, state)
+	toast(player, "✅ 가장 좋은 걸로 장착했어요", CYAN)
+end
+
+function actions.buyPass(player, _state, key)
+	local ok, reason = Passes.Prompt(player, key)
+	if not ok then
+		toast(player, reason, RED)
+	end
+end
+
+function actions.rebirth(player, state)
+	if state.run then
+		toast(player, "환생은 로비에서만 할 수 있어요", RED)
+		return
+	end
+	local need = Config.RebirthLevel(state.data.Rebirths)
+	if state.data.Level < need then
+		toast(player, "레벨 " .. need .. "이 필요해요", RED)
+		return
+	end
+	set(player, state, "Rebirths", state.data.Rebirths + 1)
+	set(player, state, "Speed", 0)
+	set(player, state, "Level", 1)
+	applyLevelStats(player, state)
+	Notify:FireClient(player, "rebirth", {
+		rebirths = state.data.Rebirths,
+		multiplier = Config.RebirthMultiplier(state.data.Rebirths),
+	})
+end
+
+function actions.teleport(player, state, world, stage)
+	if type(world) ~= "number" or type(stage) ~= "number" or not Config.Worlds[world] then
+		return
+	end
+	stage = math.floor(stage)
+	if state.run then
+		toast(player, "텔레포트는 로비에서만 할 수 있어요", RED)
+		return
+	end
+	if state.data.Level < Config.Worlds[world].level then
+		toast(player, "🔒 레벨 " .. Config.Worlds[world].level .. "이 필요해요", RED)
+		return
+	end
+	local maxStage = math.min(Config.StagesPerWorld, state.data.BestStages[world] + 1)
+	if stage < 1 or stage > maxStage then
+		toast(player, "아직 도착하지 못한 스테이지예요", RED)
+		return
+	end
+	local cost = Config.TeleportCost(world, stage)
+	if state.data.Trophies < cost then
+		toast(player, "🏆 트로피가 부족해요", RED)
+		return
+	end
+	set(player, state, "Trophies", state.data.Trophies - cost)
+	startRun(player, state, world, stage)
+end
+
+function actions.code(player, state, text)
+	if type(text) ~= "string" then
+		return
+	end
+	local code = text:upper():gsub("%s", "")
+	local reward = Config.Codes[code]
+	if not reward then
+		toast(player, "❌ 없는 코드예요", RED)
+		return
+	end
+	if state.data.Codes[code] then
+		toast(player, "이미 사용한 코드예요", RED)
+		return
+	end
+	state.data.Codes[code] = true
+	if reward.speed then
+		addSpeed(player, state, reward.speed)
+	end
+	if reward.trophies then
+		set(player, state, "Trophies", state.data.Trophies + reward.trophies)
+	end
+	toast(player, "🎟️ 코드 사용! " .. (reward.text or ""), GOLD)
+end
+
+function actions.gift(player, state)
+	local now = os.time()
+	local left = state.data.LastGift + Config.GiftCooldown - now
+	if left > 0 then
+		if ready(state, "giftWait", 3) then
+			toast(player, "🎁 다음 선물까지 " .. math.ceil(left / 60) .. "분", RED)
 		end
-		if arg == "go" and run.map.stage < Config.StagesPerWorld then
-			buildStage(player, state, run.map.stage + 1)
-		elseif arg == "stop" then
-			bankAndReturn(player, state)
-		end
-	elseif action == "upgrade" then
-		local cost = Config.UpgradeCost(data.BallUpgrade)
-		if data.Trophies < cost then
-			toast(player, "트로피가 부족해요!", Color3.fromRGB(255, 120, 120))
-			return
-		end
-		set(player, state, "Trophies", data.Trophies - cost)
-		set(player, state, "BallUpgrade", data.BallUpgrade + 1)
-		toast(
-			player,
-			Config.BallName .. " 강화! 던질 때 속도 +" .. Config.GainPerThrow(data),
-			Color3.fromRGB(120, 230, 255)
-		)
-	elseif action == "rebirth" then
-		if state.run then
-			toast(player, "환생은 로비에서만 할 수 있어요", Color3.fromRGB(255, 120, 120))
-			return
-		end
-		local need = Config.RebirthLevel(data.Rebirths)
-		if data.Level < need then
-			toast(player, "레벨 " .. need .. "이 필요해요", Color3.fromRGB(255, 120, 120))
-			return
-		end
-		set(player, state, "Rebirths", data.Rebirths + 1)
-		set(player, state, "Speed", 0)
-		set(player, state, "Level", 1)
-		applyLevelStats(player, state)
-		Notify:FireClient(player, "rebirth", {
-			rebirths = data.Rebirths,
-			multiplier = Config.RebirthMultiplier(data.Rebirths),
-		})
+		return
+	end
+	local amount = Config.GainPerThrow(speedContext(player, state)) * Config.GiftThrows
+	set(player, state, "LastGift", now)
+	addSpeed(player, state, amount)
+	Notify:FireClient(player, "gift", { speed = amount })
+end
+
+ActionRemote.OnServerEvent:Connect(function(player, action, a, b)
+	local state = states[player]
+	local handler = type(action) == "string" and actions[action]
+	if state and handler then
+		handler(player, state, a, b)
 	end
 end)
 
--- 출발 포털 ------------------------------------------------------------------
+Passes.OnChanged(function(player, key)
+	syncPasses(player)
+	local state = states[player]
+	if not state then
+		return
+	end
+	local info = Config.GamePasses[key]
+	toast(player, "🎉 " .. info.name .. " 구매 완료!", GOLD)
+	-- 스킨 게임패스는 사자마자 장착
+	for _, skin in ipairs(Config.Skins) do
+		if skin.pass == key then
+			set(player, state, "Skin", skin.id)
+		end
+	end
+end)
 
-lobby.portal.Touched:Connect(function(hit)
+-- 로비: 발판, 포털, 선물 상자 ---------------------------------------------------------------
+
+local function playerFromHit(hit)
 	local player = Players:GetPlayerFromCharacter(hit.Parent)
-	local state = player and states[player]
-	if state and not state.run then
-		startRun(player, state)
+	return player, player and states[player]
+end
+
+for index, padPart in ipairs(lobby.pads) do
+	padPart.Touched:Connect(function(hit)
+		local player, state = playerFromHit(hit)
+		if not state or index <= state.data.Pad or not ready(state, "pad" .. index, 1.5) then
+			return
+		end
+		local pad = Config.Pads[index]
+		if state.data.Trophies < pad.cost then
+			toast(player, "🏆 " .. Format.Short(pad.cost) .. " 필요해요", RED)
+			return
+		end
+		set(player, state, "Trophies", state.data.Trophies - pad.cost)
+		set(player, state, "Pad", index)
+		toast(player, "⚡ 던지기 파워 +" .. Format.Short(pad.value) .. "!", CYAN)
+	end)
+end
+
+for world, portalPad in ipairs(lobby.portals) do
+	portalPad.Touched:Connect(function(hit)
+		local player, state = playerFromHit(hit)
+		if not state or state.run then
+			return
+		end
+		local need = Config.Worlds[world].level
+		if state.data.Level < need then
+			if ready(state, "portal" .. world, 2) then
+				toast(player, "🔒 월드 " .. world .. "는 레벨 " .. need .. "부터 갈 수 있어요", RED)
+			end
+			return
+		end
+		startRun(player, state, world, 1)
+	end)
+end
+
+lobby.chest.Touched:Connect(function(hit)
+	local player, state = playerFromHit(hit)
+	if state and ready(state, "chest", 2) then
+		actions.gift(player, state)
 	end
 end)
 
--- 적 움직임과 공격 (매 프레임) -------------------------------------------------
+-- 훈련 허수아비 -----------------------------------------------------------------------------
+
+task.spawn(function()
+	while true do
+		task.wait(1 / Config.DummyThrowsPerSecond)
+		for player, state in pairs(states) do
+			local root = not state.run and getCharacterParts(player)
+			if root then
+				for _, dummy in ipairs(lobby.dummies) do
+					local offset = root.Position - dummy.position
+					if Vector3.new(offset.X, 0, offset.Z).Magnitude <= Config.DummyRange then
+						local info = Config.Dummies[dummy.tier]
+						if info.pass and not Passes.Owns(player, info.pass) then
+							if ready(state, "dummyLocked", 6) then
+								toast(player, "🔒 " .. info.name .. "는 게임패스가 필요해요", RED)
+								Passes.Prompt(player, info.pass)
+							end
+						else
+							local gain = Config.GainPerThrow(speedContext(player, state)) * info.mult
+							addSpeed(player, state, gain)
+							ThrowFx:FireAllClients(player, root.Position + Vector3.new(0, 1.5, 0), dummy.body.Position, nil, gain, state.data.Skin)
+						end
+						break
+					end
+				end
+			end
+		end
+	end
+end)
+
+-- 적 움직임과 공격 (매 프레임) ------------------------------------------------------------------
+
+-- 적이 길 밖으로 못 나가게. 길보다 큰 적(보스)은 길 가운데에 둡니다
+local function clampInside(value, low, high, margin)
+	if high - low <= margin * 2 then
+		return (low + high) / 2
+	end
+	return math.clamp(value, low + margin, high - margin)
+end
 
 local function updateEnemy(enemy, root, humanoid, map, player, dt, now)
 	local position = enemy.part.Position
@@ -726,16 +1218,15 @@ local function updateEnemy(enemy, root, humanoid, map, player, dt, now)
 	if distance > reach then
 		newPosition = position + direction * math.min(enemy.speed * dt, distance - reach)
 		local bounds = map.bounds
-		local margin = enemy.radius
 		newPosition = Vector3.new(
-			math.clamp(newPosition.X, bounds.minX + margin, bounds.maxX - margin),
+			clampInside(newPosition.X, bounds.minX, bounds.maxX, enemy.radius),
 			enemy.baseY + math.abs(math.sin(now * 8 + enemy.bobOffset)) * 0.8,
-			math.clamp(newPosition.Z, bounds.minZ + margin, bounds.maxZ - margin)
+			clampInside(newPosition.Z, bounds.minZ, bounds.maxZ, enemy.radius)
 		)
 	end
 	enemy.part.CFrame = CFrame.lookAt(newPosition, newPosition + direction)
 
-	if distance <= reach + 1 and math.abs(toPlayer.Y) < 10 and now - enemy.lastAttack >= Config.EnemyAttackCooldown then
+	if distance <= reach + 1 and math.abs(toPlayer.Y) < enemy.radius + 6 and now - enemy.lastAttack >= Config.EnemyAttackCooldown then
 		enemy.lastAttack = now
 		humanoid:TakeDamage(enemy.damage)
 		Notify:FireClient(player, "hurt", { damage = enemy.damage })
@@ -750,7 +1241,7 @@ RunService.Heartbeat:Connect(function(dt)
 			local root, humanoid = getCharacterParts(player)
 			if root then
 				if root.Position.Y < run.origin.Y - 40 then
-					humanoid.Health = 0 -- 길에서 떨어짐
+					humanoid.Health = 0 -- 키보드에서 떨어짐
 				else
 					for _, enemy in ipairs(run.map.enemies) do
 						if not enemy.dead then
@@ -763,31 +1254,129 @@ RunService.Heartbeat:Connect(function(dt)
 	end
 end)
 
--- 훈련 허수아비: 노란 원 안에 서 있으면 자동으로 던집니다 ---------------------------
+-- 운영자 이벤트: 채팅에 "/event 10 30" (속도 10배 30분), "/event off" -------------------------------
+
+local EVENT_TOPIC = "WakppuEvent"
+
+local function applyEvent(mult, ends)
+	workspace:SetAttribute("EventMult", mult)
+	workspace:SetAttribute("EventEnds", ends)
+	if mult > 1 and ends > os.time() then
+		for _, player in ipairs(Players:GetPlayers()) do
+			toast(player, "⚡ 운영자 이벤트! 속도 x" .. Format.Short(mult), GOLD)
+		end
+	end
+end
+
+pcall(function()
+	MessagingService:SubscribeAsync(EVENT_TOPIC, function(message)
+		local payload = message.Data
+		if type(payload) == "table" and type(payload.mult) == "number" and type(payload.ends) == "number" then
+			applyEvent(payload.mult, payload.ends)
+		end
+	end)
+end)
+
+local function isAdmin(player)
+	if RunService:IsStudio() then
+		return true
+	end
+	if game.CreatorType == Enum.CreatorType.User and player.UserId == game.CreatorId then
+		return true
+	end
+	return table.find(Config.Admins, player.UserId) ~= nil
+end
+
+local function onChatted(player, message)
+	if not isAdmin(player) then
+		return
+	end
+	local words = string.split(message, " ")
+	if words[1] ~= "/event" then
+		return
+	end
+	local mult, ends
+	if words[2] == "off" then
+		mult, ends = 1, 0
+	else
+		mult = math.clamp(tonumber(words[2]) or 2, 1, 1e6)
+		ends = os.time() + math.clamp(tonumber(words[3]) or 30, 1, 24 * 60) * 60
+	end
+	applyEvent(mult, ends)
+	pcall(function()
+		MessagingService:PublishAsync(EVENT_TOPIC, { mult = mult, ends = ends })
+	end)
+end
 
 task.spawn(function()
 	while true do
-		task.wait(1 / Config.DummyThrowsPerSecond)
-		for player, state in pairs(states) do
-			if not state.run then
-				local root = getCharacterParts(player)
-				if root then
-					local offset = root.Position - lobby.dummy.Position
-					if Vector3.new(offset.X, 0, offset.Z).Magnitude <= Config.DummyRange then
-						local gain = Config.GainPerThrow(state.data) * Config.DummyMultiplier
-						addSpeed(player, state, gain)
-						ThrowFx:FireAllClients(player, root.Position + Vector3.new(0, 1.5, 0), lobby.dummy.Position, nil, gain)
-					end
-				end
+		task.wait(1)
+		if workspace:GetAttribute("EventMult") ~= 1 and workspace:GetAttribute("EventEnds") <= os.time() then
+			workspace:SetAttribute("EventMult", 1)
+			for _, player in ipairs(Players:GetPlayers()) do
+				toast(player, "운영자 이벤트가 끝났어요", Color3.new(1, 1, 1))
 			end
 		end
 	end
 end)
 
--- 플레이어 입장/퇴장 -----------------------------------------------------------
+-- 랭킹 보드 ---------------------------------------------------------------------------------
+
+local nameCache = {}
+
+local function nameFor(userId)
+	if nameCache[userId] then
+		return nameCache[userId]
+	end
+	local ok, name = pcall(function()
+		return Players:GetNameFromUserIdAsync(userId)
+	end)
+	nameCache[userId] = ok and name or ("#" .. userId)
+	return nameCache[userId]
+end
+
+local function refreshBoard()
+	local rows = {}
+	local ok = false
+	if Data.TopStore then
+		ok = pcall(function()
+			local page = Data.TopStore:GetSortedAsync(false, 10):GetCurrentPage()
+			for rank, entry in ipairs(page) do
+				rows[rank] = rank .. ". " .. nameFor(tonumber(entry.key)) .. "  ⚡" .. Format.Short(entry.value)
+			end
+		end)
+	end
+	if ok and #rows > 0 then
+		World.SetBoardRows(lobby.board, "🏆 전체 속도 TOP 10", rows)
+		return
+	end
+	-- 저장이 꺼져 있으면 이 서버 사람들로 보여줍니다
+	local list = {}
+	for player, state in pairs(states) do
+		table.insert(list, { name = player.Name, speed = state.data.Speed })
+	end
+	table.sort(list, function(a, b)
+		return a.speed > b.speed
+	end)
+	rows = {}
+	for rank = 1, math.min(10, #list) do
+		rows[rank] = rank .. ". " .. list[rank].name .. "  ⚡" .. Format.Short(list[rank].speed)
+	end
+	World.SetBoardRows(lobby.board, "🏆 이 서버 속도 TOP", rows)
+end
+
+task.spawn(function()
+	while true do
+		refreshBoard()
+		task.wait(Data.TopStore and 60 or 10)
+	end
+end)
+
+-- 플레이어 입장/퇴장 -------------------------------------------------------------------------
 
 local function onCharacterAdded(player, character)
 	local humanoid = character:WaitForChild("Humanoid")
+	character:WaitForChild("HumanoidRootPart")
 	humanoid.Died:Connect(function()
 		onDied(player)
 	end)
@@ -795,6 +1384,7 @@ local function onCharacterAdded(player, character)
 	if state then
 		applyLevelStats(player, state)
 		humanoid.Health = humanoid.MaxHealth
+		applyAura(player, state)
 	end
 end
 
@@ -802,35 +1392,46 @@ local function onPlayerAdded(player)
 	player.CharacterAdded:Connect(function(character)
 		onCharacterAdded(player, character)
 	end)
+	player.Chatted:Connect(function(message)
+		onChatted(player, message)
+	end)
 
 	local data = Data.Load(player)
+	Passes.Load(player)
 	if not player.Parent then
 		return
 	end
 	data.Level = Config.LevelFromSpeed(data.Speed)
 	data.Unbanked = 0
+	data.World = 0
 	data.Stage = 0
 	data.EnemiesLeft = 0
 
 	local leaderstats = Instance.new("Folder")
 	leaderstats.Name = "leaderstats"
-	for _, key in ipairs({ "Trophies", "Level", "BestStage" }) do
-		local value = Instance.new("IntValue")
-		value.Name = LEADERSTATS[key]
-		value.Value = data[key]
+	for _, info in ipairs({ { "⚡ 속도", "StringValue" }, { "🏆 트로피", "StringValue" }, { "🔁 환생", "IntValue" } }) do
+		local value = Instance.new(info[2])
+		value.Name = info[1]
 		value.Parent = leaderstats
 	end
 	leaderstats.Parent = player
 
-	local state = { data = data, lastThrow = 0, run = nil }
+	local state = { data = data, lastThrow = 0, run = nil, cooldowns = {} }
 	states[player] = state
+	updateLeaderstats(player, state)
 	for key, value in pairs(data) do
-		player:SetAttribute(key, value)
+		if type(value) == "table" then
+			syncTable(player, state, key)
+		else
+			player:SetAttribute(key, value)
+		end
 	end
+	syncPasses(player)
 	player:SetAttribute("Ready", true)
 
 	if player.Character then
 		applyLevelStats(player, state)
+		applyAura(player, state)
 	end
 end
 
@@ -843,6 +1444,7 @@ local function onPlayerRemoving(player)
 	states[player] = nil
 	Data.Save(player, state.data)
 	Data.Release(player)
+	Passes.Release(player)
 end
 
 for _, player in ipairs(Players:GetPlayers()) do
@@ -877,10 +1479,107 @@ end)
       </Item>
       <Item class="ModuleScript" referent="8">
         <Properties>
+          <string name="Name">Passes</string>
+          <string name="Source"><![CDATA[--[[
+	게임패스 확인과 구매 창 띄우기
+	Config.GamePasses의 id가 0이면 아직 만들지 않은 것으로 보고 "준비 중"이라고 알려줍니다.
+]]
+
+local MarketplaceService = game:GetService("MarketplaceService")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config"))
+
+local Passes = {}
+
+local owned = {} -- [player] = { [key] = true }
+local changedCallback
+
+local function keyForId(id)
+	for key, info in pairs(Config.GamePasses) do
+		if info.id == id and id ~= 0 then
+			return key
+		end
+	end
+	return nil
+end
+
+function Passes.Load(player)
+	local result = {}
+	local studioFree = Config.StudioOwnsAllPasses and RunService:IsStudio()
+	for key, info in pairs(Config.GamePasses) do
+		if studioFree then
+			result[key] = true
+		elseif info.id ~= 0 then
+			local ok, has = pcall(function()
+				return MarketplaceService:UserOwnsGamePassAsync(player.UserId, info.id)
+			end)
+			if ok and has then
+				result[key] = true
+			end
+		end
+	end
+	owned[player] = result
+	return result
+end
+
+function Passes.Get(player)
+	return owned[player] or {}
+end
+
+function Passes.Owns(player, key)
+	return key ~= nil and (owned[player] or {})[key] == true
+end
+
+-- 구매 창을 띄웁니다. 성공하면 false, 이유 문자열을 돌려줍니다
+function Passes.Prompt(player, key)
+	local info = Config.GamePasses[key]
+	if not info then
+		return false, "없는 상품이에요"
+	end
+	if Passes.Owns(player, key) then
+		return false, "이미 가지고 있어요"
+	end
+	if info.id == 0 then
+		return false, "'" .. info.name .. "' 게임패스는 아직 준비 중이에요 (Config.GamePasses에 id를 넣어주세요)"
+	end
+	MarketplaceService:PromptGamePassPurchase(player, info.id)
+	return true
+end
+
+function Passes.OnChanged(callback)
+	changedCallback = callback
+end
+
+function Passes.Release(player)
+	owned[player] = nil
+end
+
+MarketplaceService.PromptGamePassPurchaseFinished:Connect(function(player, passId, purchased)
+	if not purchased then
+		return
+	end
+	local key = keyForId(passId)
+	if key and owned[player] then
+		owned[player][key] = true
+		if changedCallback then
+			changedCallback(player, key)
+		end
+	end
+end)
+
+return Passes
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="9">
+        <Properties>
           <string name="Name">World</string>
           <string name="Source"><![CDATA[--[[
-	맵을 코드로 만듭니다: 로비(스폰, 출발 포털, 훈련 허수아비)와 스테이지(길, 적, 출구).
-	스테이지는 플레이어마다 따로 만들어지고, 다음 스테이지로 가면 지워집니다.
+	맵을 코드로 만듭니다.
+	로비: 스폰, 던지기 파워 발판, 훈련 허수아비 5종, 월드 포털 3개, 무료 선물 상자, 랭킹 보드
+	스테이지: 키보드 키로 된 길 → 잠긴 문 → 안전지대(노란 귀환 발판 / 초록 다음 포털)
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -893,6 +1592,8 @@ local Format = require(ReplicatedStorage.Shared:WaitForChild("Format"))
 local World = {}
 
 local random = Random.new()
+
+local KEY_LETTERS = { "Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P", "A", "S", "D", "F", "G", "H", "J", "K", "L", "Z", "X", "C", "V", "B", "N", "M" }
 
 local function part(props)
 	local p = Instance.new("Part")
@@ -909,20 +1610,22 @@ local function part(props)
 end
 
 -- 파트 위에 떠 있는 글자 (크기는 스터드 단위)
-local function sign(adornee, text, width, height, offsetY, color)
+function World.Sign(adornee, text, width, height, offsetY, color)
 	local gui = Instance.new("BillboardGui")
+	gui.Name = "Sign"
 	gui.Size = UDim2.new(width, 0, height, 0)
 	gui.StudsOffset = Vector3.new(0, offsetY, 0)
-	gui.MaxDistance = 300
+	gui.MaxDistance = 250
 	gui.LightInfluence = 0
 
 	local label = Instance.new("TextLabel")
+	label.Name = "Label"
 	label.Size = UDim2.fromScale(1, 1)
 	label.BackgroundTransparency = 1
 	label.Font = Enum.Font.FredokaOne
 	label.TextScaled = true
 	label.TextColor3 = color or Color3.new(1, 1, 1)
-	label.TextStrokeTransparency = 0.2
+	label.TextStrokeTransparency = 0
 	label.Text = text
 	label.Parent = gui
 
@@ -930,44 +1633,89 @@ local function sign(adornee, text, width, height, offsetY, color)
 	return label
 end
 
--- 로비 ---------------------------------------------------------------------
+local sign = World.Sign
+
+local function disc(props)
+	-- 원기둥을 눕혀서 납작한 원판으로 씁니다
+	local radius = props.Radius
+	props.Radius = nil
+	props.Shape = Enum.PartType.Cylinder
+	props.Size = Vector3.new(props.Thickness or 0.4, radius * 2, radius * 2)
+	props.Thickness = nil
+	props.CFrame = CFrame.new(props.Position) * CFrame.Angles(0, 0, math.rad(90))
+	props.Position = nil
+	return part(props)
+end
+
+-- 로비 -------------------------------------------------------------------------
+
+local function buildPortal(folder, position, world)
+	local info = Config.Worlds[world]
+	local model = Instance.new("Model")
+	model.Name = "World" .. world
+	model.Parent = folder
+	local frameColor = info.bossColor
+	for _, x in ipairs({ -9, 9 }) do
+		part({ Name = "Pillar", Size = Vector3.new(3, 18, 3), Position = position + Vector3.new(x, 9, 0), Color = frameColor, Material = Enum.Material.SmoothPlastic, Parent = model })
+	end
+	local top = part({ Name = "Top", Size = Vector3.new(21, 3, 3), Position = position + Vector3.new(0, 19.5, 0), Color = frameColor, Material = Enum.Material.SmoothPlastic, Parent = model })
+	part({
+		Name = "Glow",
+		Size = Vector3.new(15, 16, 0.5),
+		Position = position + Vector3.new(0, 9, 0),
+		Color = info.dangerColor,
+		Material = Enum.Material.Neon,
+		Transparency = 0.35,
+		CanCollide = false,
+		Parent = model,
+	})
+	local pad = disc({ Name = "Pad", Radius = 8, Position = position + Vector3.new(0, 0.2, 6), Color = info.dangerColor, Material = Enum.Material.Neon, CanCollide = false, Parent = model })
+	pad:SetAttribute("World", world)
+	local levelText = info.level > 1 and ("🔒 Lv " .. info.level .. " 필요") or "▶ 출발!"
+	local label = sign(top, "월드 " .. world .. " · " .. info.name .. "\n" .. levelText, 22, 6, 5, Color3.new(1, 1, 1))
+	label.Name = "PortalLabel"
+	return pad
+end
+
+local function buildDummy(folder, base, tier)
+	local info = Config.Dummies[tier]
+	local model = Instance.new("Model")
+	model.Name = "Dummy" .. tier
+	model:SetAttribute("Tier", tier)
+	model.Parent = folder
+	disc({ Name = "Zone", Radius = Config.DummyRange, Thickness = 0.3, Position = base + Vector3.new(0, 0.1, 0), Color = Color3.fromRGB(255, 235, 120), Material = Enum.Material.Neon, Transparency = 0.55, CanCollide = false, Parent = model })
+	part({ Name = "Post", Size = Vector3.new(1, 8, 1), Position = base + Vector3.new(0, 4, 0), Color = Color3.fromRGB(120, 85, 55), Material = Enum.Material.Wood, Parent = model })
+	local body = part({ Name = "Body", Size = Vector3.new(4, 4, 2), Position = base + Vector3.new(0, 6, 0), Color = info.color, Material = Enum.Material.SmoothPlastic, Parent = model })
+	part({ Name = "Arms", Size = Vector3.new(8, 1, 1), Position = base + Vector3.new(0, 7, 0), Color = Color3.fromRGB(120, 85, 55), Material = Enum.Material.Wood, Parent = model })
+	local head = part({ Name = "Head", Shape = Enum.PartType.Ball, Size = Vector3.new(3, 3, 3), Position = base + Vector3.new(0, 9.5, 0), Color = info.color, Material = Enum.Material.SmoothPlastic, Parent = model })
+	local face = Instance.new("Decal")
+	face.Texture = "rbxasset://textures/face.png"
+	face.Face = Enum.NormalId.Front
+	face.Parent = head
+	sign(head, info.name .. "\n훈련 x" .. info.mult, 12, 3.5, 4, Color3.new(1, 1, 1))
+	return { model = model, body = body, tier = tier, position = base }
+end
 
 function World.BuildLobby()
 	local folder = Instance.new("Folder")
 	folder.Name = "Lobby"
 	folder.Parent = workspace
 
-	part({
-		Name = "Ground",
-		Size = Vector3.new(160, 2, 160),
-		Position = Vector3.new(0, -1, 0),
-		Color = Color3.fromRGB(110, 190, 95),
-		Material = Enum.Material.Grass,
-		Parent = folder,
-	})
-
-	-- 가장자리 울타리
+	part({ Name = "Ground", Size = Vector3.new(220, 2, 220), Position = Vector3.new(0, -1, 0), Color = Color3.fromRGB(110, 200, 100), Material = Enum.Material.Grass, Parent = folder })
 	for _, info in ipairs({
-		{ Vector3.new(0, 1.5, 80), Vector3.new(160, 3, 2) },
-		{ Vector3.new(0, 1.5, -80), Vector3.new(160, 3, 2) },
-		{ Vector3.new(80, 1.5, 0), Vector3.new(2, 3, 160) },
-		{ Vector3.new(-80, 1.5, 0), Vector3.new(2, 3, 160) },
+		{ Vector3.new(0, 2, 110), Vector3.new(220, 4, 2) },
+		{ Vector3.new(0, 2, -110), Vector3.new(220, 4, 2) },
+		{ Vector3.new(110, 2, 0), Vector3.new(2, 4, 220) },
+		{ Vector3.new(-110, 2, 0), Vector3.new(2, 4, 220) },
 	}) do
-		part({
-			Name = "Fence",
-			Position = info[1],
-			Size = info[2],
-			Color = Color3.fromRGB(150, 105, 70),
-			Material = Enum.Material.Wood,
-			Parent = folder,
-		})
+		part({ Name = "Fence", Position = info[1], Size = info[2], Color = Color3.fromRGB(150, 105, 70), Material = Enum.Material.Wood, Parent = folder })
 	end
 
 	local spawnLocation = Instance.new("SpawnLocation")
 	spawnLocation.Name = "Spawn"
 	spawnLocation.Anchored = true
-	spawnLocation.Size = Vector3.new(10, 1, 10)
-	spawnLocation.Position = Vector3.new(0, 0.5, 25)
+	spawnLocation.Size = Vector3.new(12, 1, 12)
+	spawnLocation.Position = Vector3.new(0, 0.5, 0)
 	spawnLocation.Color = Color3.fromRGB(255, 170, 210)
 	spawnLocation.Material = Enum.Material.SmoothPlastic
 	spawnLocation.Neutral = true
@@ -975,140 +1723,101 @@ function World.BuildLobby()
 	spawnLocation.TopSurface = Enum.SurfaceType.Smooth
 	spawnLocation.Parent = folder
 
-	local titlePost = part({
-		Name = "Title",
-		Size = Vector3.new(1, 1, 1),
-		Position = Vector3.new(0, 18, 0),
-		Transparency = 1,
-		CanCollide = false,
-		Parent = folder,
-	})
-	sign(titlePost, "🎯 " .. Config.GameName, 40, 8, 0, Color3.fromRGB(255, 220, 120))
+	local title = part({ Name = "Title", Size = Vector3.new(1, 1, 1), Position = Vector3.new(0, 24, -20), Transparency = 1, CanCollide = false, Parent = folder })
+	sign(title, "🎯 " .. Config.GameName, 50, 10, 0, Color3.fromRGB(255, 220, 120))
 
-	-- 출발 포털
-	local portal = part({
-		Name = "Portal",
-		Shape = Enum.PartType.Cylinder,
-		Size = Vector3.new(1, 16, 16),
-		CFrame = CFrame.new(0, 0.5, -40) * CFrame.Angles(0, 0, math.rad(90)),
-		Color = Color3.fromRGB(170, 90, 255),
-		Material = Enum.Material.Neon,
-		CanCollide = false,
-		Parent = folder,
-	})
-	for _, x in ipairs({ -9, 9 }) do
-		part({
-			Name = "PortalPillar",
-			Size = Vector3.new(2, 14, 2),
-			Position = Vector3.new(x, 7, -40),
-			Color = Color3.fromRGB(90, 50, 160),
-			Material = Enum.Material.SmoothPlastic,
-			Parent = folder,
+	-- 던지기 파워 발판 (스폰 앞쪽)
+	local padFolder = Instance.new("Folder")
+	padFolder.Name = "Pads"
+	padFolder.Parent = folder
+	local pads = {}
+	local padCount = #Config.Pads
+	for index, pad in ipairs(Config.Pads) do
+		local x = (index - (padCount + 1) / 2) * 11
+		local padPart = part({
+			Name = "Pad" .. index,
+			Size = Vector3.new(9, 1, 9),
+			Position = Vector3.new(x, 0.5, -30),
+			Color = Color3.fromRGB(255, 200, 60),
+			Material = Enum.Material.Neon,
+			Parent = padFolder,
 		})
+		padPart:SetAttribute("PadIndex", index)
+		sign(padPart, "+" .. Format.Short(pad.value) .. "\n🏆 " .. Format.Short(pad.cost), 7, 4, 4, Color3.new(1, 1, 1))
+		pads[index] = padPart
 	end
-	local portalTop = part({
-		Name = "PortalTop",
-		Size = Vector3.new(20, 2, 2),
-		Position = Vector3.new(0, 15, -40),
-		Color = Color3.fromRGB(90, 50, 160),
-		Material = Enum.Material.SmoothPlastic,
-		Parent = folder,
-	})
-	sign(portalTop, "▶ 출발! 스테이지 1부터", 24, 4, 4, Color3.fromRGB(230, 200, 255))
+	local padTitle = part({ Name = "PadTitle", Size = Vector3.new(1, 1, 1), Position = Vector3.new(0, 11, -30), Transparency = 1, CanCollide = false, Parent = folder })
+	sign(padTitle, "⚡ 던지기 파워 · 밟아서 구매", 34, 4, 0, Color3.fromRGB(255, 240, 160))
 
-	-- 훈련 허수아비
-	local dummyBase = Vector3.new(45, 0, 10)
-	part({
-		Name = "DummyZone",
-		Shape = Enum.PartType.Cylinder,
-		Size = Vector3.new(0.2, Config.DummyRange * 2, Config.DummyRange * 2),
-		CFrame = CFrame.new(dummyBase + Vector3.new(0, 0.1, 0)) * CFrame.Angles(0, 0, math.rad(90)),
-		Color = Color3.fromRGB(255, 240, 150),
-		Material = Enum.Material.Neon,
-		Transparency = 0.6,
-		CanCollide = false,
-		Parent = folder,
-	})
-	part({
-		Name = "DummyPost",
-		Size = Vector3.new(1, 8, 1),
-		Position = dummyBase + Vector3.new(0, 4, 0),
-		Color = Color3.fromRGB(130, 90, 55),
-		Material = Enum.Material.Wood,
-		Parent = folder,
-	})
-	local dummy = part({
-		Name = "Dummy",
-		Size = Vector3.new(4, 4, 2),
-		Position = dummyBase + Vector3.new(0, 6, 0),
-		Color = Color3.fromRGB(225, 190, 120),
-		Material = Enum.Material.Fabric,
-		Parent = folder,
-	})
-	part({
-		Name = "DummyArms",
-		Size = Vector3.new(8, 1, 1),
-		Position = dummyBase + Vector3.new(0, 7, 0),
-		Color = Color3.fromRGB(130, 90, 55),
-		Material = Enum.Material.Wood,
-		Parent = folder,
-	})
-	local head = part({
-		Name = "DummyHead",
-		Shape = Enum.PartType.Ball,
-		Size = Vector3.new(3, 3, 3),
-		Position = dummyBase + Vector3.new(0, 9.5, 0),
-		Color = Color3.fromRGB(225, 190, 120),
-		Material = Enum.Material.Fabric,
-		Parent = folder,
-	})
-	sign(head, "훈련 허수아비\n노란 원 안에 서 있으면 자동으로 던져요", 16, 4, 4.5, Color3.fromRGB(255, 240, 170))
+	-- 훈련 허수아비 (스폰 뒤쪽, 원작의 트레드밀 자리)
+	local dummyFolder = Instance.new("Folder")
+	dummyFolder.Name = "Dummies"
+	dummyFolder.Parent = folder
+	local dummies = {}
+	for tier = 1, #Config.Dummies do
+		local x = (tier - (#Config.Dummies + 1) / 2) * 20
+		dummies[tier] = buildDummy(dummyFolder, Vector3.new(x, 0, 32), tier)
+	end
+	local dummyTitle = part({ Name = "DummyTitle", Size = Vector3.new(1, 1, 1), Position = Vector3.new(0, 18, 32), Transparency = 1, CanCollide = false, Parent = folder })
+	sign(dummyTitle, "🥊 훈련장 · 노란 원 안에 서 있으면 자동 훈련", 44, 4, 0, Color3.fromRGB(255, 240, 160))
+
+	-- 월드 포털 (맨 뒤)
+	local portalFolder = Instance.new("Folder")
+	portalFolder.Name = "Portals"
+	portalFolder.Parent = folder
+	local portals = {}
+	for world = 1, #Config.Worlds do
+		local x = (world - (#Config.Worlds + 1) / 2) * 40
+		portals[world] = buildPortal(portalFolder, Vector3.new(x, 0, -80), world)
+	end
+
+	-- 무료 선물 상자
+	local chest = part({ Name = "GiftChest", Size = Vector3.new(8, 6, 6), Position = Vector3.new(-70, 3, 0), Color = Color3.fromRGB(230, 70, 90), Material = Enum.Material.SmoothPlastic, Parent = folder })
+	part({ Name = "Ribbon", Size = Vector3.new(1.5, 6.2, 6.2), Position = Vector3.new(-70, 3, 0), Color = Color3.fromRGB(255, 220, 80), Material = Enum.Material.Neon, CanCollide = false, Parent = folder })
+	sign(chest, "🎁 무료 선물\n밟으면 받기", 14, 5, 6, Color3.fromRGB(255, 240, 160))
+
+	-- 랭킹 보드
+	local board = part({ Name = "Leaderboard", Size = Vector3.new(1, 26, 20), Position = Vector3.new(80, 13, 0), Color = Color3.fromRGB(40, 35, 60), Material = Enum.Material.SmoothPlastic, Parent = folder })
 
 	return {
 		folder = folder,
-		spawn = spawnLocation,
-		portal = portal,
-		dummy = dummy,
 		spawnCFrame = spawnLocation.CFrame + Vector3.new(0, 4, 0),
+		pads = pads,
+		dummies = dummies,
+		portals = portals,
+		chest = chest,
+		board = board,
 	}
 end
 
--- 스테이지 -------------------------------------------------------------------
+-- 스테이지 ------------------------------------------------------------------------
 
 local function pickEnemyType(stage)
 	local pool, total = {}, 0
-	for _, enemyType in ipairs(Config.EnemyTypes) do
+	for index, enemyType in ipairs(Config.EnemyTypes) do
 		if stage >= enemyType.minStage then
-			table.insert(pool, enemyType)
+			table.insert(pool, index)
 			total += enemyType.weight
 		end
 	end
 	local roll = random:NextNumber(0, total)
-	for _, enemyType in ipairs(pool) do
-		roll -= enemyType.weight
+	for _, index in ipairs(pool) do
+		roll -= Config.EnemyTypes[index].weight
 		if roll <= 0 then
-			return enemyType
+			return index
 		end
 	end
 	return pool[#pool]
 end
 
--- 스테이지가 깊을수록 길 색이 초록 → 주황 → 빨강으로 바뀝니다
-local function pathColor(stage)
-	local t = math.clamp((stage - 1) / math.max(1, Config.StagesPerWorld - 1), 0, 1)
-	local safe = Color3.fromRGB(140, 200, 110)
-	local danger = Color3.fromRGB(200, 90, 80)
-	return safe:Lerp(danger, t)
-end
-
-local function createEnemy(folder, enemyType, position, stage)
-	local size = enemyType.size
+local function createEnemy(folder, spec)
+	local size = spec.size
 	local body = part({
-		Name = enemyType.id,
-		Shape = enemyType.shape == "Ball" and Enum.PartType.Ball or Enum.PartType.Block,
+		Name = spec.name,
+		Shape = spec.shape == "Ball" and Enum.PartType.Ball or Enum.PartType.Block,
 		Size = Vector3.new(size, size, size),
-		CFrame = CFrame.new(position),
-		Color = enemyType.color,
+		CFrame = CFrame.new(spec.position),
+		Color = spec.color,
 		Material = Enum.Material.SmoothPlastic,
 		Parent = folder,
 	})
@@ -1118,12 +1827,10 @@ local function createEnemy(folder, enemyType, position, stage)
 	face.Face = Enum.NormalId.Front
 	face.Parent = body
 
-	local maxHealth = math.max(1, math.floor(Config.EnemyHealth(stage) * enemyType.health))
-
 	local gui = Instance.new("BillboardGui")
-	gui.Size = UDim2.fromOffset(110, 34)
+	gui.Size = spec.boss and UDim2.fromOffset(220, 56) or UDim2.fromOffset(110, 34)
 	gui.StudsOffset = Vector3.new(0, size / 2 + 1.5, 0)
-	gui.MaxDistance = 120
+	gui.MaxDistance = spec.boss and 250 or 120
 	gui.Parent = body
 
 	local nameLabel = Instance.new("TextLabel")
@@ -1131,9 +1838,9 @@ local function createEnemy(folder, enemyType, position, stage)
 	nameLabel.BackgroundTransparency = 1
 	nameLabel.Font = Enum.Font.FredokaOne
 	nameLabel.TextScaled = true
-	nameLabel.TextColor3 = Color3.new(1, 1, 1)
-	nameLabel.TextStrokeTransparency = 0.3
-	nameLabel.Text = enemyType.name
+	nameLabel.TextColor3 = spec.boss and Color3.fromRGB(255, 220, 90) or Color3.new(1, 1, 1)
+	nameLabel.TextStrokeTransparency = 0.2
+	nameLabel.Text = spec.boss and ("👑 " .. spec.name) or spec.name
 	nameLabel.Parent = gui
 
 	local barBack = Instance.new("Frame")
@@ -1155,22 +1862,22 @@ local function createEnemy(folder, enemyType, position, stage)
 	hpLabel.Font = Enum.Font.FredokaOne
 	hpLabel.TextScaled = true
 	hpLabel.TextColor3 = Color3.new(1, 1, 1)
-	hpLabel.Text = Format.Short(maxHealth)
+	hpLabel.Text = Format.Short(spec.health)
 	hpLabel.ZIndex = 2
 	hpLabel.Parent = barBack
 
 	return {
 		part = body,
-		type = enemyType,
-		health = maxHealth,
-		maxHealth = maxHealth,
-		damage = math.floor(Config.EnemyDamage(stage) * enemyType.damage),
-		speed = enemyType.speed,
+		health = spec.health,
+		maxHealth = spec.health,
+		damage = spec.damage,
+		speed = spec.speed,
 		radius = size / 2,
-		baseY = position.Y,
+		baseY = spec.position.Y,
 		bobOffset = random:NextNumber(0, math.pi * 2),
 		lastAttack = 0,
 		dead = false,
+		boss = spec.boss,
 		bar = bar,
 		hpLabel = hpLabel,
 	}
@@ -1196,98 +1903,173 @@ function World.KillEnemy(enemy)
 	Debris:AddItem(body, 0.3)
 end
 
+-- 키보드 키처럼 생긴 길. 일부 줄은 비워서 점프 구간을 만듭니다
+local function buildKeyPath(folder, origin, stage, worldInfo, length, width)
+	local rowDepth = 4
+	local rows = math.floor(length / rowDepth)
+	local columns = math.max(2, math.floor(width / 6 + 0.5))
+	local keyWidth = width / columns
+
+	local gapRows = {}
+	local gapCount = Config.GapCount(stage)
+	for g = 1, gapCount do
+		-- 시작 부분과 끝 부분을 피해서 고르게 배치
+		local row = math.floor(rows * g / (gapCount + 1))
+		if row > 4 and row < rows - 3 then
+			gapRows[row] = true
+		end
+	end
+
+	local t = (stage - 1) / math.max(1, Config.StagesPerWorld - 1)
+	for row = 0, rows - 1 do
+		if not gapRows[row] then
+			for column = 0, columns - 1 do
+				local x = -width / 2 + keyWidth * (column + 0.5)
+				local z = -10 - rowDepth * (row + 0.5)
+				local base = worldInfo.keyColors[(row + column) % 2 + 1]
+				local key = part({
+					Name = "Key",
+					Size = Vector3.new(keyWidth - 0.35, 1.6, rowDepth - 0.35),
+					Position = origin + Vector3.new(x, -0.8, z),
+					Color = base:Lerp(worldInfo.dangerColor, t * 0.6),
+					Material = Enum.Material.SmoothPlastic,
+					Parent = folder,
+				})
+				if (row * columns + column) % 7 == 0 then
+					local surface = Instance.new("SurfaceGui")
+					surface.Face = Enum.NormalId.Top
+					surface.CanvasSize = Vector2.new(100, 100)
+					surface.LightInfluence = 0
+					local letter = Instance.new("TextLabel")
+					letter.Size = UDim2.fromScale(1, 1)
+					letter.BackgroundTransparency = 1
+					letter.Font = Enum.Font.FredokaOne
+					letter.TextScaled = true
+					letter.TextColor3 = Color3.fromRGB(80, 80, 100)
+					letter.TextTransparency = 0.3
+					letter.Text = KEY_LETTERS[random:NextInteger(1, #KEY_LETTERS)]
+					letter.Parent = surface
+					surface.Parent = key
+				end
+			end
+		end
+	end
+	return rows * rowDepth
+end
+
 --[[
-	origin: 스테이지 시작점 (길 윗면 높이)
-	스테이지는 origin에서 -Z 방향으로 뻗어 있습니다.
-	[출발 발판] → [길 + 적] → [잠긴 문] → [출구 발판]
+	origin: 스테이지 시작점 (길 윗면 높이). 스테이지는 origin에서 -Z 방향으로 뻗어 있습니다.
+	[출발 발판] → [키보드 길 + 적] → [잠긴 문] → [안전지대: 노란 귀환 발판 / 초록 다음 포털]
 ]]
-function World.BuildStage(origin, stage, ownerName)
+function World.BuildStage(origin, world, stage, ownerName)
+	local worldInfo = Config.Worlds[world]
 	local folder = Instance.new("Folder")
-	folder.Name = ownerName .. "_Stage" .. stage
+	folder.Name = ownerName .. "_W" .. world .. "S" .. stage
 	folder.Parent = workspace
 
-	local length = Config.PathLength(stage)
 	local width = Config.PathWidth(stage)
+	local length = buildKeyPath(folder, origin, stage, worldInfo, Config.PathLength(stage), width)
 	local endZ = -10 - length
 
 	local function at(x, y, z)
 		return origin + Vector3.new(x, y, z)
 	end
 
-	local startPad = part({
-		Name = "Start",
-		Size = Vector3.new(26, 2, 20),
-		Position = at(0, -1, 0),
-		Color = Color3.fromRGB(235, 235, 245),
-		Material = Enum.Material.SmoothPlastic,
-		Parent = folder,
-	})
-	sign(startPad, "스테이지 " .. stage .. " / " .. Config.StagesPerWorld, 18, 4, 8, Color3.fromRGB(255, 255, 255))
+	local startPad = part({ Name = "Start", Size = Vector3.new(26, 2, 20), Position = at(0, -1, 0), Color = Color3.fromRGB(235, 235, 245), Material = Enum.Material.SmoothPlastic, Parent = folder })
+	sign(startPad, "월드 " .. world .. " · 스테이지 " .. stage .. " / " .. Config.StagesPerWorld, 22, 4, 8, Color3.new(1, 1, 1))
 
-	part({
-		Name = "Path",
-		Size = Vector3.new(width, 2, length),
-		Position = at(0, -1, -10 - length / 2),
-		Color = pathColor(stage),
-		Material = Enum.Material.Grass,
-		Parent = folder,
-	})
+	-- 안전지대
+	part({ Name = "SafeZone", Size = Vector3.new(44, 2, 36), Position = at(0, -1, endZ - 18), Color = Color3.fromRGB(235, 235, 245), Material = Enum.Material.SmoothPlastic, Parent = folder })
 
-	part({
-		Name = "End",
-		Size = Vector3.new(26, 2, 30),
-		Position = at(0, -1, endZ - 15),
-		Color = Color3.fromRGB(235, 235, 245),
-		Material = Enum.Material.SmoothPlastic,
-		Parent = folder,
-	})
+	local gate = part({ Name = "Gate", Size = Vector3.new(44, 22, 2), Position = at(0, 11, endZ - 2), Color = Color3.fromRGB(230, 70, 70), Material = Enum.Material.Neon, Transparency = 0.35, Parent = folder })
+	local gateLabel = sign(gate, "", 22, 4, 14, Color3.fromRGB(255, 225, 225))
 
-	local gate = part({
-		Name = "Gate",
-		Size = Vector3.new(26, 20, 2),
-		Position = at(0, 10, endZ - 3),
-		Color = Color3.fromRGB(230, 70, 70),
-		Material = Enum.Material.Neon,
-		Transparency = 0.35,
-		Parent = folder,
-	})
-	local gateLabel = sign(gate, "", 20, 4, 13, Color3.fromRGB(255, 220, 220))
-
-	local exitPad = part({
-		Name = "Exit",
+	local isLast = stage >= Config.StagesPerWorld
+	local bankPad = part({
+		Name = "BankPad",
 		Size = Vector3.new(12, 1, 12),
-		Position = at(0, 0.5, endZ - 18),
-		Color = Color3.fromRGB(90, 230, 120),
+		Position = at(isLast and 0 or -11, 0.5, endZ - 20),
+		Color = Color3.fromRGB(255, 215, 50),
 		Material = Enum.Material.Neon,
 		CanCollide = false,
 		Parent = folder,
 	})
+	sign(bankPad, isLast and "👑 월드 클리어!\n🟡 귀환 · 트로피 받기" or "🟡 귀환\n트로피 받기", 12, 5, 5, Color3.fromRGB(255, 245, 180))
 
-	-- 적 배치: 길을 따라 고르게 흩어 놓습니다
+	local nextPortal
+	if not isLast then
+		nextPortal = part({
+			Name = "NextPortal",
+			Size = Vector3.new(12, 1, 12),
+			Position = at(11, 0.5, endZ - 20),
+			Color = Color3.fromRGB(80, 230, 120),
+			Material = Enum.Material.Neon,
+			CanCollide = false,
+			Parent = folder,
+		})
+		part({ Name = "NextArch", Size = Vector3.new(12, 14, 1), Position = at(11, 7, endZ - 27), Color = Color3.fromRGB(80, 230, 120), Material = Enum.Material.Neon, Transparency = 0.4, CanCollide = false, Parent = folder })
+		sign(
+			nextPortal,
+			"🟢 전진 ▶ 스테이지 " .. (stage + 1) .. "\n권장 Lv " .. Format.Short(Config.RecommendedLevel(world, stage + 1)),
+			12,
+			5,
+			5,
+			Color3.fromRGB(200, 255, 210)
+		)
+	end
+
+	-- 적 배치
 	local enemyFolder = Instance.new("Folder")
 	enemyFolder.Name = "Enemies"
 	enemyFolder.Parent = folder
 
 	local enemies = {}
-	local count = Config.EnemyCount(stage)
-	local firstZ, lastZ = -40, endZ + 15
+	local count = Config.EnemyCount(world, stage)
+	local health = Config.EnemyHealth(world, stage)
+	local damage = Config.EnemyDamage(world, stage)
+	local firstZ, lastZ = -40, endZ + 25
 	for i = 1, count do
-		local enemyType = pickEnemyType(stage)
+		local typeIndex = pickEnemyType(stage)
+		local enemyType = Config.EnemyTypes[typeIndex]
 		local t = count == 1 and 0.5 or (i - 1) / (count - 1)
-		local z = firstZ + (lastZ - firstZ) * t + random:NextNumber(-6, 6)
+		local z = firstZ + (lastZ - firstZ) * t + random:NextNumber(-5, 5)
 		local halfRoom = math.max(0, width / 2 - enemyType.size / 2 - 1)
-		local x = random:NextNumber(-halfRoom, halfRoom)
-		local position = at(x, enemyType.size / 2, z)
-		table.insert(enemies, createEnemy(enemyFolder, enemyType, position, stage))
+		table.insert(enemies, createEnemy(enemyFolder, {
+			name = worldInfo.enemyNames[typeIndex] or enemyType.id,
+			shape = enemyType.shape,
+			size = enemyType.size,
+			color = enemyType.color:Lerp(worldInfo.bossColor, 0.3),
+			position = at(random:NextNumber(-halfRoom, halfRoom), enemyType.size / 2, z),
+			health = math.max(1, math.floor(health * enemyType.health)),
+			damage = math.ceil(damage * enemyType.damage),
+			speed = enemyType.speed,
+		}))
+	end
+
+	if isLast then
+		local boss = Config.Boss
+		table.insert(enemies, createEnemy(enemyFolder, {
+			name = worldInfo.bossName,
+			shape = "Ball",
+			size = boss.size,
+			color = worldInfo.bossColor,
+			position = at(0, boss.size / 2, endZ + 14),
+			health = health * boss.health,
+			damage = damage * boss.damage,
+			speed = boss.speed,
+			boss = true,
+		}))
 	end
 
 	local map = {
 		folder = folder,
+		world = world,
 		stage = stage,
 		enemies = enemies,
 		gate = gate,
 		gateLabel = gateLabel,
-		exitPad = exitPad,
+		bankPad = bankPad,
+		nextPortal = nextPortal,
 		startCFrame = CFrame.lookAt(at(0, 4, 0), at(0, 4, -10)),
 		bounds = {
 			minX = origin.X - width / 2,
@@ -1302,7 +2084,7 @@ end
 
 function World.UpdateGate(map, enemiesLeft)
 	if enemiesLeft > 0 then
-		map.gateLabel.Text = "🔒 남은 적 " .. enemiesLeft .. "마리"
+		map.gateLabel.Text = "🔒 남은 적 " .. enemiesLeft
 		return
 	end
 	map.gateLabel.Text = "🚪 출구 열림!"
@@ -1311,25 +2093,68 @@ function World.UpdateGate(map, enemiesLeft)
 	TweenService:Create(map.gate, TweenInfo.new(0.6), { Transparency = 0.85 }):Play()
 end
 
+-- 랭킹 보드 내용 ----------------------------------------------------------------
+
+function World.SetBoardRows(board, title, rows)
+	local surface = board:FindFirstChild("BoardGui")
+	if not surface then
+		surface = Instance.new("SurfaceGui")
+		surface.Name = "BoardGui"
+		surface.Face = Enum.NormalId.Left
+		surface.CanvasSize = Vector2.new(400, 520)
+		surface.LightInfluence = 0
+		surface.Parent = board
+
+		local layout = Instance.new("UIListLayout")
+		layout.SortOrder = Enum.SortOrder.LayoutOrder
+		layout.Padding = UDim.new(0, 4)
+		layout.Parent = surface
+	end
+	for _, child in ipairs(surface:GetChildren()) do
+		if child:IsA("TextLabel") then
+			child:Destroy()
+		end
+	end
+	local function line(order, text, color, height)
+		local label = Instance.new("TextLabel")
+		label.LayoutOrder = order
+		label.Size = UDim2.new(1, 0, 0, height)
+		label.BackgroundTransparency = 1
+		label.Font = Enum.Font.FredokaOne
+		label.TextScaled = true
+		label.TextColor3 = color
+		label.Text = text
+		label.Parent = surface
+	end
+	line(0, title, Color3.fromRGB(255, 220, 90), 60)
+	for i, row in ipairs(rows) do
+		local color = i == 1 and Color3.fromRGB(255, 215, 60)
+			or i == 2 and Color3.fromRGB(220, 220, 230)
+			or i == 3 and Color3.fromRGB(230, 160, 100)
+			or Color3.new(1, 1, 1)
+		line(i, row, color, 40)
+	end
+end
+
 return World
 ]]></string>
         </Properties>
       </Item>
     </Item>
   </Item>
-  <Item class="StarterPlayer" referent="9">
+  <Item class="StarterPlayer" referent="10">
     <Properties>
       <string name="Name">StarterPlayer</string>
     </Properties>
-    <Item class="StarterPlayerScripts" referent="10">
+    <Item class="StarterPlayerScripts" referent="11">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="Folder" referent="11">
+      <Item class="Folder" referent="12">
         <Properties>
           <string name="Name">Client</string>
         </Properties>
-        <Item class="ModuleScript" referent="12">
+        <Item class="ModuleScript" referent="13">
           <Properties>
             <string name="Name">Effects</string>
             <string name="Source"><![CDATA[--[[
@@ -1341,6 +2166,9 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local Debris = game:GetService("Debris")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config"))
 
 local player = Players.LocalPlayer
 
@@ -1416,8 +2244,38 @@ function Effects.PlayClick()
 	sounds.click:Play()
 end
 
+local RAINBOW = ColorSequence.new({
+	ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 80, 80)),
+	ColorSequenceKeypoint.new(0.33, Color3.fromRGB(255, 230, 80)),
+	ColorSequenceKeypoint.new(0.66, Color3.fromRGB(80, 220, 255)),
+	ColorSequenceKeypoint.new(1, Color3.fromRGB(200, 90, 255)),
+})
+
+-- 장착한 스킨 색과 꼬리(트레일)를 단 볼
+local function makeBall(skinId)
+	local skin = Config.FindById(Config.Skins, skinId) or Config.Skins[1]
+	local ball = ballTemplate:Clone()
+	ball.Color = skin.color
+	local a0 = Instance.new("Attachment")
+	a0.Position = Vector3.new(0, 0.5, 0)
+	a0.Parent = ball
+	local a1 = Instance.new("Attachment")
+	a1.Position = Vector3.new(0, -0.5, 0)
+	a1.Parent = ball
+	local trail = Instance.new("Trail")
+	trail.Attachment0 = a0
+	trail.Attachment1 = a1
+	trail.Lifetime = 0.25
+	trail.LightEmission = 1
+	trail.FaceCamera = true
+	trail.Color = skin.rainbow and RAINBOW or ColorSequence.new(skin.color)
+	trail.Transparency = NumberSequence.new(0.2, 1)
+	trail.Parent = ball
+	return ball, skin
+end
+
 -- 포물선을 그리며 날아가는 볼
-function Effects.Throw(from, to, onArrive)
+function Effects.Throw(from, to, skinId, onArrive)
 	if activeBalls >= MAX_BALLS then
 		if onArrive then
 			onArrive()
@@ -1426,7 +2284,7 @@ function Effects.Throw(from, to, onArrive)
 	end
 	activeBalls += 1
 
-	local ball = ballTemplate:Clone()
+	local ball, skin = makeBall(skinId)
 	ball.Position = from
 	ball.Parent = fxFolder
 
@@ -1440,6 +2298,9 @@ function Effects.Throw(from, to, onArrive)
 		local alpha = math.min(1, (os.clock() - startTime) / duration)
 		local position = from:Lerp(to, alpha) + Vector3.new(0, math.sin(alpha * math.pi) * arc, 0)
 		ball.CFrame = CFrame.new(position) * CFrame.Angles(alpha * 12, 0, 0)
+		if skin.rainbow then
+			ball.Color = Color3.fromHSV((os.clock() * 2) % 1, 0.8, 1)
+		end
 		if alpha >= 1 then
 			connection:Disconnect()
 			ball:Destroy()
@@ -1531,12 +2392,13 @@ return Effects
 ]]></string>
           </Properties>
         </Item>
-        <Item class="LocalScript" referent="13">
+        <Item class="LocalScript" referent="14">
           <Properties>
             <string name="Name">Main</string>
             <string name="Source"><![CDATA[--[[
-	왁뿌볼 던지기 — 클라이언트
-	화면 UI, 클릭해서 던지기, 자동 던지기, 귀환/전진 선택창, 사망 연출
+	왁뿌볼 던지기 — 클라이언트 화면
+	왼쪽: 상점 · 텔레포트 · 코드 · 선물   오른쪽: 환생 · 자동
+	위: 트로피, 운영자 이벤트, 스테이지 정보(미수령 트로피)   아래: 속도 + 던지기 버튼
 ]]
 
 local Players = game:GetService("Players")
@@ -1550,6 +2412,9 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared:WaitForChild("Config"))
 local Format = require(Shared:WaitForChild("Format"))
 local Effects = require(script.Parent:WaitForChild("Effects"))
+local Ui = require(script.Parent:WaitForChild("Ui"))
+local State = require(script.Parent:WaitForChild("State"))
+local Menus = require(script.Parent:WaitForChild("Menus"))
 
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 local ThrowRemote = Remotes:WaitForChild("Throw")
@@ -1557,101 +2422,10 @@ local ActionRemote = Remotes:WaitForChild("Action")
 local ThrowFx = Remotes:WaitForChild("ThrowFx")
 local Notify = Remotes:WaitForChild("Notify")
 
-local function attr(name)
-	return player:GetAttribute(name) or 0
-end
+local C = Ui.Colors
+local create = Ui.Create
 
--- UI 만들기 도우미 ------------------------------------------------------------
-
-local COLORS = {
-	panel = Color3.fromRGB(30, 26, 48),
-	stroke = Color3.fromRGB(255, 255, 255),
-	text = Color3.fromRGB(255, 255, 255),
-	speed = Color3.fromRGB(127, 232, 255),
-	gold = Color3.fromRGB(255, 214, 90),
-	green = Color3.fromRGB(80, 200, 110),
-	orange = Color3.fromRGB(255, 140, 60),
-	red = Color3.fromRGB(235, 80, 80),
-	pink = Color3.fromRGB(255, 130, 190),
-	disabled = Color3.fromRGB(110, 110, 120),
-}
-
-local function create(className, props, children)
-	local instance = Instance.new(className)
-	for key, value in pairs(props) do
-		if key ~= "Parent" then
-			instance[key] = value
-		end
-	end
-	for _, child in ipairs(children or {}) do
-		child.Parent = instance
-	end
-	instance.Parent = props.Parent
-	return instance
-end
-
-local function corner(radius)
-	return create("UICorner", { CornerRadius = UDim.new(0, radius or 12) })
-end
-
-local function border(color, thickness, transparency)
-	return create("UIStroke", {
-		Color = color or COLORS.stroke,
-		Thickness = thickness or 2,
-		Transparency = transparency or 0.6,
-		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-	})
-end
-
-local function padding(pixels)
-	local p = UDim.new(0, pixels)
-	return create("UIPadding", { PaddingLeft = p, PaddingRight = p, PaddingTop = p, PaddingBottom = p })
-end
-
-local function label(props)
-	props.BackgroundTransparency = props.BackgroundTransparency or 1
-	props.Font = props.Font or Enum.Font.FredokaOne
-	props.TextColor3 = props.TextColor3 or COLORS.text
-	if props.TextScaled == nil then
-		props.TextScaled = true
-	end
-	return create("TextLabel", props)
-end
-
-local function button(props, silent)
-	props.Font = props.Font or Enum.Font.FredokaOne
-	props.TextColor3 = props.TextColor3 or COLORS.text
-	props.TextScaled = true
-	props.AutoButtonColor = true
-	local b = create("TextButton", props, {
-		corner(12),
-		border(Color3.new(0, 0, 0), 3, 0.5),
-		create("UIPadding", { PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 8), PaddingTop = UDim.new(0, 6), PaddingBottom = UDim.new(0, 6) }),
-	})
-	if not silent then
-		b.Activated:Connect(Effects.PlayClick)
-	end
-	return b
-end
-
-local function panel(props, children)
-	props.BackgroundColor3 = props.BackgroundColor3 or COLORS.panel
-	props.BackgroundTransparency = props.BackgroundTransparency or 0.15
-	local frame = create("Frame", props, { corner(14), border(), padding(10) })
-	for _, child in ipairs(children or {}) do
-		child.Parent = frame
-	end
-	return frame
-end
-
--- 살짝 커졌다 돌아오는 효과
-local function pop(guiObject, size)
-	local scale = guiObject:FindFirstChild("PopScale") or create("UIScale", { Name = "PopScale", Parent = guiObject })
-	scale.Scale = size or 1.25
-	TweenService:Create(scale, TweenInfo.new(0.25, Enum.EasingStyle.Back), { Scale = 1 }):Play()
-end
-
--- 화면 --------------------------------------------------------------------
+-- 화면 ----------------------------------------------------------------------------
 
 local screen = create("ScreenGui", {
 	Name = "Hud",
@@ -1665,333 +2439,413 @@ local uiScale = create("UIScale", { Parent = screen })
 local camera = workspace.CurrentCamera or workspace:WaitForChild("Camera")
 local function updateScale()
 	local viewport = camera.ViewportSize
-	uiScale.Scale = math.clamp(math.min(viewport.X / 1280, viewport.Y / 720), 0.55, 1)
+	uiScale.Scale = math.clamp(math.min(viewport.X / 1280, viewport.Y / 720), 0.5, 1)
 end
 updateScale()
 camera:GetPropertyChangedSignal("ViewportSize"):Connect(updateScale)
 
--- 왼쪽 위: 내 능력치
-local statsPanel = panel({
-	Name = "Stats",
-	Position = UDim2.fromOffset(12, 12),
-	Size = UDim2.fromOffset(250, 170),
+-- 위 가운데: 트로피 ---------------------------------------------------------------------
+
+local trophyPill = Ui.Panel({
+	Name = "Trophies",
+	AnchorPoint = Vector2.new(0.5, 0),
+	Position = UDim2.new(0.5, 0, 0, 6),
+	Size = UDim2.fromOffset(280, 58),
+	BackgroundColor3 = C.gold,
+	BackgroundTransparency = 0,
 	Parent = screen,
 })
-local speedLabel = label({
-	Size = UDim2.new(1, 0, 0, 32),
-	TextXAlignment = Enum.TextXAlignment.Left,
-	RichText = true,
-	Parent = statsPanel,
-})
-local levelLabel = label({
-	Position = UDim2.fromOffset(0, 36),
-	Size = UDim2.new(1, 0, 0, 26),
-	TextXAlignment = Enum.TextXAlignment.Left,
-	Parent = statsPanel,
-})
-local levelBar = create("Frame", {
-	Position = UDim2.fromOffset(0, 66),
-	Size = UDim2.new(1, 0, 0, 16),
-	BackgroundColor3 = Color3.fromRGB(15, 12, 25),
-	Parent = statsPanel,
-}, { corner(8) })
-local levelFill = create("Frame", {
-	Size = UDim2.fromScale(0, 1),
-	BackgroundColor3 = COLORS.speed,
-	Parent = levelBar,
-}, { corner(8) })
-local levelBarText = label({
-	Size = UDim2.fromScale(1, 1),
-	TextColor3 = Color3.new(1, 1, 1),
-	TextStrokeTransparency = 0.4,
-	ZIndex = 2,
-	Parent = levelBar,
-})
-local trophyLabel = label({
-	Position = UDim2.fromOffset(0, 88),
-	Size = UDim2.new(1, 0, 0, 28),
-	TextXAlignment = Enum.TextXAlignment.Left,
-	RichText = true,
-	Parent = statsPanel,
-})
-local rebirthLabel = label({
-	Position = UDim2.fromOffset(0, 122),
-	Size = UDim2.new(1, 0, 0, 24),
-	TextXAlignment = Enum.TextXAlignment.Left,
-	TextColor3 = Color3.fromRGB(220, 200, 255),
-	Parent = statsPanel,
-})
+Ui.Shine().Parent = trophyPill
+local trophyLabel = Ui.Text({ Size = UDim2.new(1, -16, 1, -8), Position = UDim2.fromOffset(8, 4), TextStroke = 3, Parent = trophyPill })
 
--- 위 가운데: 스테이지 진행 중 정보 (미수령 트로피를 크게)
-local runPanel = panel({
-	Name = "Run",
+local eventBanner = Ui.Panel({
+	Name = "Event",
 	AnchorPoint = Vector2.new(0.5, 0),
-	Position = UDim2.new(0.5, 0, 0, 12),
-	Size = UDim2.fromOffset(400, 150),
+	Position = UDim2.new(0.5, 0, 0, 70),
+	Size = UDim2.fromOffset(440, 40),
+	BackgroundColor3 = C.red,
+	BackgroundTransparency = 0,
 	Visible = false,
 	Parent = screen,
 })
-local stageLabel = label({ Size = UDim2.new(1, 0, 0, 28), Parent = runPanel })
-local recommendedLabel = label({ Position = UDim2.fromOffset(0, 30), Size = UDim2.new(1, 0, 0, 20), Parent = runPanel })
-local unbankedLabel = label({
-	Position = UDim2.fromOffset(0, 54),
-	Size = UDim2.new(1, 0, 0, 46),
-	TextColor3 = COLORS.gold,
-	TextStrokeTransparency = 0.5,
-	Parent = runPanel,
+local eventLabel = Ui.Text({ Size = UDim2.new(1, -12, 1, -6), Position = UDim2.fromOffset(6, 3), Parent = eventBanner })
+
+-- 위 가운데: 스테이지 진행 정보 (미수령 트로피를 크게)
+local runPanel = Ui.Panel({
+	Name = "Run",
+	AnchorPoint = Vector2.new(0.5, 0),
+	Position = UDim2.new(0.5, 0, 0, 116),
+	Size = UDim2.fromOffset(440, 150),
+	Visible = false,
+	Parent = screen,
 })
-label({
-	Position = UDim2.fromOffset(0, 102),
-	Size = UDim2.new(1, 0, 0, 22),
+local stageLabel = Ui.Text({ Position = UDim2.fromOffset(10, 8), Size = UDim2.new(1, -20, 0, 28), Parent = runPanel })
+local recommendedLabel = Ui.Text({ Position = UDim2.fromOffset(10, 38), Size = UDim2.new(1, -20, 0, 20), Parent = runPanel })
+local unbankedLabel = Ui.Text({ Position = UDim2.fromOffset(10, 60), Size = UDim2.new(1, -20, 0, 50), TextColor3 = C.gold, TextStroke = 3, Parent = runPanel })
+local runHint = Ui.Text({
+	Position = UDim2.fromOffset(10, 114),
+	Size = UDim2.new(1, -20, 0, 26),
 	TextColor3 = Color3.fromRGB(255, 200, 200),
 	Text = "미수령 트로피 · 죽으면 전부 사라져요!",
 	Parent = runPanel,
 })
 
--- 위 가운데: 로비 안내
-local lobbyHint = panel({
-	Name = "LobbyHint",
-	AnchorPoint = Vector2.new(0.5, 0),
-	Position = UDim2.new(0.5, 0, 0, 12),
-	Size = UDim2.fromOffset(560, 70),
-	Parent = screen,
-}, {
-	label({
-		Size = UDim2.fromScale(1, 1),
-		Text = "💡 클릭할 때마다 "
-			.. Config.BallName
-			.. "을 던지고 속도 +1!\n보라색 포털 = 스테이지 출발 · 노란 원 = 자동 훈련",
-		TextColor3 = Color3.fromRGB(255, 240, 200),
-	}),
-})
+-- 왼쪽: 메뉴 버튼 ------------------------------------------------------------------------
 
--- 아래 가운데: 던지기 / 자동
-local throwButton = button({
+local function column(anchorX, positionX)
+	local frame = create("Frame", {
+		AnchorPoint = Vector2.new(anchorX, 0.5),
+		Position = UDim2.new(anchorX, positionX, 0.5, 0),
+		Size = UDim2.fromOffset(90, 440),
+		BackgroundTransparency = 1,
+		Parent = screen,
+	})
+	create("UIListLayout", {
+		Padding = UDim.new(0, 26),
+		SortOrder = Enum.SortOrder.LayoutOrder,
+		VerticalAlignment = Enum.VerticalAlignment.Center,
+		HorizontalAlignment = Enum.HorizontalAlignment.Center,
+		Parent = frame,
+	})
+	return frame
+end
+
+local leftColumn = column(0, 14)
+local rightColumn = column(1, -14)
+
+Ui.IconButton({ Name = "Shop", Icon = "🛒", Caption = "상점", Color = C.orange, LayoutOrder = 1, Parent = leftColumn }, function()
+	Menus.Toggle("shop")
+end)
+Ui.IconButton({ Name = "Teleport", Icon = "🌀", Caption = "텔레포트", Color = C.purple, LayoutOrder = 2, Parent = leftColumn }, function()
+	Menus.Toggle("teleport")
+end)
+Ui.IconButton({ Name = "Codes", Icon = "🎟️", Caption = "코드", Color = C.blue, LayoutOrder = 3, Parent = leftColumn }, function()
+	Menus.Toggle("codes")
+end)
+local _, giftCaption, giftBadge = Ui.IconButton({ Name = "Gift", Icon = "🎁", Caption = "선물", Color = C.pink, LayoutOrder = 4, Parent = leftColumn }, function()
+	ActionRemote:FireServer("gift")
+end)
+
+-- 오른쪽: 환생 / 자동 -------------------------------------------------------------------------
+
+local _, rebirthCaption, rebirthBadge = Ui.IconButton({ Name = "Rebirth", Icon = "🔁", Caption = "환생", Color = C.red, LayoutOrder = 1, Parent = rightColumn }, function()
+	Menus.Toggle("rebirth")
+end)
+
+local autoOn = false
+local autoButton, autoCaption = Ui.IconButton({ Name = "Auto", Icon = "🤖", Caption = "자동 끔", Color = C.disabled, LayoutOrder = 2, Parent = rightColumn })
+
+-- 아래: 속도 + 던지기 ---------------------------------------------------------------------------
+
+local speedPanel = Ui.Panel({
+	Name = "Speed",
+	AnchorPoint = Vector2.new(0.5, 1),
+	Position = UDim2.new(0.5, 0, 1, -104),
+	Size = UDim2.fromOffset(380, 92),
+	Parent = screen,
+})
+local speedLabel = Ui.Text({ Position = UDim2.fromOffset(10, 4), Size = UDim2.new(1, -20, 0, 44), TextColor3 = C.speed, TextStroke = 3, Parent = speedPanel })
+local levelBar = create("Frame", {
+	Position = UDim2.fromOffset(12, 54),
+	Size = UDim2.new(1, -24, 0, 28),
+	BackgroundColor3 = Color3.fromRGB(15, 12, 25),
+	Parent = speedPanel,
+}, { Ui.Corner(10), Ui.Outline(2) })
+local levelFill = create("Frame", { Size = UDim2.fromScale(0, 1), BackgroundColor3 = C.green, Parent = levelBar }, { Ui.Corner(10), Ui.Shine() })
+local levelText = Ui.Text({ Size = UDim2.new(1, -10, 1, -4), Position = UDim2.fromOffset(5, 2), ZIndex = 2, Parent = levelBar })
+
+local throwButton = Ui.Button({
 	Name = "Throw",
 	AnchorPoint = Vector2.new(0.5, 1),
-	Position = UDim2.new(0.5, 0, 1, -24),
-	Size = UDim2.fromOffset(220, 74),
-	BackgroundColor3 = COLORS.pink,
+	Position = UDim2.new(0.5, 0, 1, -16),
+	Size = UDim2.fromOffset(250, 78),
+	BackgroundColor3 = C.pink,
 	Text = "🎯 던지기!",
-	Parent = screen,
-}, true)
-local autoOn = false
-local autoButton = button({
-	Name = "Auto",
-	AnchorPoint = Vector2.new(1, 1),
-	Position = UDim2.new(0.5, -124, 1, -30),
-	Size = UDim2.fromOffset(150, 56),
-	BackgroundColor3 = COLORS.disabled,
-	Text = "자동: 끔",
-	Visible = Config.FreeAutoThrow,
+	Radius = 20,
 	Parent = screen,
 })
 
--- 오른쪽: 강화 / 환생
-local shopPanel = panel({
-	Name = "Shop",
-	AnchorPoint = Vector2.new(1, 0.5),
-	Position = UDim2.new(1, -12, 0.5, 0),
-	Size = UDim2.fromOffset(250, 270),
-	Parent = screen,
-})
-label({ Size = UDim2.new(1, 0, 0, 28), Text = "⚾ " .. Config.BallName .. " 강화", Parent = shopPanel })
-local upgradeInfo = label({
-	Position = UDim2.fromOffset(0, 30),
-	Size = UDim2.new(1, 0, 0, 22),
-	TextColor3 = COLORS.speed,
-	Parent = shopPanel,
-})
-local upgradeButton = button({
-	Position = UDim2.fromOffset(0, 56),
-	Size = UDim2.new(1, 0, 0, 46),
-	BackgroundColor3 = COLORS.gold,
-	TextColor3 = Color3.fromRGB(60, 40, 0),
-	Parent = shopPanel,
-})
-label({
-	Position = UDim2.fromOffset(0, 116),
-	Size = UDim2.new(1, 0, 0, 28),
-	Text = "🔁 환생",
-	Parent = shopPanel,
-})
-local rebirthInfo = label({
-	Position = UDim2.fromOffset(0, 146),
-	Size = UDim2.new(1, 0, 0, 40),
-	TextColor3 = Color3.fromRGB(220, 200, 255),
-	Parent = shopPanel,
-})
-local rebirthButton = button({
-	Position = UDim2.fromOffset(0, 192),
-	Size = UDim2.new(1, 0, 0, 46),
-	BackgroundColor3 = Color3.fromRGB(150, 90, 240),
-	Parent = shopPanel,
-})
+-- 알림 / 획득 / 사망 ------------------------------------------------------------------------
 
--- 가운데: 스테이지 클리어 → 귀환 / 전진 선택창
-local choicePanel = panel({
-	Name = "Choice",
+local toastLabel = Ui.Text({
 	AnchorPoint = Vector2.new(0.5, 0.5),
-	Position = UDim2.fromScale(0.5, 0.5),
-	Size = UDim2.fromOffset(480, 320),
-	BackgroundTransparency = 0.05,
-	Visible = false,
-	ZIndex = 5,
+	Position = UDim2.fromScale(0.5, 0.36),
+	Size = UDim2.fromOffset(760, 52),
+	TextStroke = 3,
+	ZIndex = 30,
 	Parent = screen,
 })
-local choiceTitle = label({ Size = UDim2.new(1, 0, 0, 44), TextColor3 = COLORS.gold, Parent = choicePanel })
-local choiceReward = label({ Position = UDim2.fromOffset(0, 50), Size = UDim2.new(1, 0, 0, 30), Parent = choicePanel })
-local choiceTotal = label({
-	Position = UDim2.fromOffset(0, 84),
-	Size = UDim2.new(1, 0, 0, 44),
-	TextColor3 = COLORS.gold,
-	Parent = choicePanel,
-})
-local choiceWarning = label({
-	Position = UDim2.fromOffset(0, 134),
-	Size = UDim2.new(1, 0, 0, 56),
-	TextColor3 = Color3.fromRGB(255, 190, 190),
-	Parent = choicePanel,
-})
-local stopButton = button({
-	AnchorPoint = Vector2.new(0, 1),
-	Position = UDim2.new(0, 0, 1, 0),
-	Size = UDim2.new(0.48, 0, 0, 70),
-	BackgroundColor3 = COLORS.green,
-	Parent = choicePanel,
-})
-local goButton = button({
-	AnchorPoint = Vector2.new(1, 1),
-	Position = UDim2.new(1, 0, 1, 0),
-	Size = UDim2.new(0.48, 0, 0, 70),
-	BackgroundColor3 = COLORS.orange,
-	Parent = choicePanel,
-})
-
--- 사망 화면
-local deathOverlay = create("Frame", {
-	Name = "Death",
-	Size = UDim2.fromScale(1, 1),
-	BackgroundColor3 = Color3.fromRGB(120, 0, 0),
-	BackgroundTransparency = 1,
-	Visible = false,
-	ZIndex = 10,
-	Parent = screen,
-})
-local deathTitle = label({
-	AnchorPoint = Vector2.new(0.5, 0.5),
-	Position = UDim2.fromScale(0.5, 0.4),
-	Size = UDim2.fromOffset(600, 80),
-	Text = "💀 쓰러졌다…",
-	ZIndex = 11,
-	Parent = deathOverlay,
-})
-local deathLost = label({
-	AnchorPoint = Vector2.new(0.5, 0.5),
-	Position = UDim2.fromScale(0.5, 0.52),
-	Size = UDim2.fromOffset(600, 60),
-	TextColor3 = COLORS.gold,
-	ZIndex = 11,
-	Parent = deathOverlay,
-})
-
--- 알림
-local toastLabel = label({
-	AnchorPoint = Vector2.new(0.5, 0.5),
-	Position = UDim2.fromScale(0.5, 0.3),
-	Size = UDim2.fromOffset(700, 50),
-	TextStrokeTransparency = 0.2,
-	TextTransparency = 1,
-	ZIndex = 8,
-	Parent = screen,
-})
+toastLabel.TextTransparency = 1
+local toastStroke = toastLabel:FindFirstChildOfClass("UIStroke")
+toastStroke.Transparency = 1
 
 local toastToken = 0
 local function showToast(text, color)
 	toastToken += 1
 	local token = toastToken
 	toastLabel.Text = text
-	toastLabel.TextColor3 = color or COLORS.text
+	toastLabel.TextColor3 = color or C.text
 	toastLabel.TextTransparency = 0
-	toastLabel.TextStrokeTransparency = 0.2
-	pop(toastLabel, 1.2)
-	task.delay(1.8, function()
+	toastStroke.Transparency = 0
+	Ui.Pop(toastLabel, 1.25)
+	task.delay(2, function()
 		if token == toastToken then
-			TweenService:Create(toastLabel, TweenInfo.new(0.4), { TextTransparency = 1, TextStrokeTransparency = 1 }):Play()
+			TweenService:Create(toastLabel, TweenInfo.new(0.4), { TextTransparency = 1 }):Play()
+			TweenService:Create(toastStroke, TweenInfo.new(0.4), { Transparency = 1 }):Play()
 		end
 	end)
 end
 
--- 화면 갱신 ------------------------------------------------------------------
+-- 새 왁뿌볼 획득 연출
+local rewardCard = Ui.Panel({
+	Name = "Reward",
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	Position = UDim2.fromScale(0.5, 0.5),
+	Size = UDim2.fromOffset(420, 300),
+	BackgroundTransparency = 0,
+	Visible = false,
+	ZIndex = 40,
+	Parent = screen,
+})
+local rewardTitle = Ui.Text({ Position = UDim2.fromOffset(10, 14), Size = UDim2.new(1, -20, 0, 46), TextColor3 = C.gold, TextStroke = 3, ZIndex = 41, Parent = rewardCard })
+local rewardBall = create("Frame", {
+	AnchorPoint = Vector2.new(0.5, 0),
+	Position = UDim2.new(0.5, 0, 0, 74),
+	Size = UDim2.fromOffset(120, 120),
+	ZIndex = 41,
+	Parent = rewardCard,
+}, { Ui.Round(), Ui.Outline(4), Ui.Shine() })
+local rewardName = Ui.Text({ Position = UDim2.fromOffset(10, 206), Size = UDim2.new(1, -20, 0, 36), ZIndex = 41, Parent = rewardCard })
+local rewardMult = Ui.Text({ Position = UDim2.fromOffset(10, 246), Size = UDim2.new(1, -20, 0, 30), TextColor3 = C.speed, ZIndex = 41, Parent = rewardCard })
 
-local lastUnbanked = 0
-local rebirthConfirmUntil = 0
-
-local function refresh()
-	local speed = attr("Speed")
-	local level = math.max(1, attr("Level"))
-	local trophies = attr("Trophies")
-	local rebirths = attr("Rebirths")
-	local upgrades = attr("BallUpgrade")
-	local stage = attr("Stage")
-	local inRun = stage > 0
-
-	speedLabel.Text = '⚡ 속도  <font color="#7FE8FF">' .. Format.Short(speed) .. "</font>"
-	levelLabel.Text = "⭐ 레벨 " .. level
-	local current, nextSpeed = Config.SpeedForLevel(level), Config.SpeedForLevel(level + 1)
-	levelFill.Size = UDim2.fromScale(math.clamp((speed - current) / math.max(1, nextSpeed - current), 0, 1), 1)
-	levelBarText.Text = "다음 레벨까지 " .. Format.Short(math.max(0, nextSpeed - speed))
-	trophyLabel.Text = '🏆 트로피  <font color="#FFD65A">' .. Format.Short(trophies) .. "</font>"
-	rebirthLabel.Text = "🔁 환생 " .. rebirths .. "회 · 속도 x" .. Config.RebirthMultiplier(rebirths)
-
-	runPanel.Visible = inRun
-	lobbyHint.Visible = not inRun
-	if inRun then
-		local enemiesLeft = attr("EnemiesLeft")
-		local enemiesText = enemiesLeft > 0 and ("👾 남은 적 " .. enemiesLeft) or "🚪 출구 열림! 초록 발판으로"
-		stageLabel.Text = "스테이지 " .. stage .. " / " .. Config.StagesPerWorld .. "  ·  " .. enemiesText
-		local recommended = Config.RecommendedLevel(stage)
-		recommendedLabel.Text = "권장 Lv " .. recommended .. "  (내 Lv " .. level .. ")"
-		recommendedLabel.TextColor3 = level >= recommended and Color3.fromRGB(170, 255, 170) or Color3.fromRGB(255, 150, 150)
+local function showReward(title, skinId)
+	local skin = Config.FindById(Config.Skins, skinId)
+	if not skin then
+		return
 	end
-	local unbanked = attr("Unbanked")
-	unbankedLabel.Text = "💰 " .. Format.Short(unbanked)
-	if unbanked > lastUnbanked then
-		pop(unbankedLabel, 1.4)
-	end
-	lastUnbanked = unbanked
-
-	-- 강화
-	local gainNow = Config.GainPerThrow({ BallUpgrade = upgrades, Rebirths = rebirths })
-	local gainNext = Config.GainPerThrow({ BallUpgrade = upgrades + 1, Rebirths = rebirths })
-	upgradeInfo.Text = "던질 때 속도 +" .. Format.Short(gainNow) .. " → +" .. Format.Short(gainNext)
-	local cost = Config.UpgradeCost(upgrades)
-	upgradeButton.Text = "🏆 " .. Format.Short(cost) .. " 로 강화"
-	upgradeButton.BackgroundColor3 = trophies >= cost and COLORS.gold or COLORS.disabled
-
-	-- 환생
-	local need = Config.RebirthLevel(rebirths)
-	rebirthInfo.Text = "속도·레벨 초기화 (트로피는 유지)\n속도 배수 x"
-		.. Config.RebirthMultiplier(rebirths)
-		.. " → x"
-		.. Config.RebirthMultiplier(rebirths + 1)
-	local canRebirth = level >= need and not inRun
-	if inRun then
-		rebirthButton.Text = "로비에서만 가능"
-	elseif level < need then
-		rebirthButton.Text = "Lv " .. need .. " 필요"
-	elseif os.clock() < rebirthConfirmUntil then
-		rebirthButton.Text = "정말? 한 번 더!"
-	else
-		rebirthButton.Text = "환생하기!"
-	end
-	rebirthButton.BackgroundColor3 = canRebirth and Color3.fromRGB(150, 90, 240) or COLORS.disabled
+	rewardTitle.Text = title
+	rewardBall.BackgroundColor3 = skin.color
+	rewardName.Text = skin.name .. " · " .. Config.Rarities[skin.rarity].name
+	rewardName.TextColor3 = Config.Rarities[skin.rarity].color
+	rewardMult.Text = "속도 x" .. Format.Short(skin.mult)
+	rewardCard.Visible = true
+	Ui.Pop(rewardCard, 0.4)
+	Effects.PlayLevelUp()
+	task.delay(2.8, function()
+		rewardCard.Visible = false
+	end)
 end
 
-player.AttributeChanged:Connect(refresh)
+local deathOverlay = create("Frame", {
+	Name = "Death",
+	Size = UDim2.fromScale(1, 1),
+	BackgroundColor3 = Color3.fromRGB(120, 0, 0),
+	BackgroundTransparency = 1,
+	Visible = false,
+	ZIndex = 50,
+	Parent = screen,
+})
+local deathTitle = Ui.Text({
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	Position = UDim2.fromScale(0.5, 0.38),
+	Size = UDim2.fromOffset(640, 90),
+	Text = "💀 쓰러졌다…",
+	TextStroke = 4,
+	ZIndex = 51,
+	Parent = deathOverlay,
+})
+local deathLost = Ui.Text({
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	Position = UDim2.fromScale(0.5, 0.5),
+	Size = UDim2.fromOffset(640, 64),
+	TextColor3 = C.gold,
+	TextStroke = 3,
+	ZIndex = 51,
+	Parent = deathOverlay,
+})
+local deathKept = Ui.Text({
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	Position = UDim2.fromScale(0.5, 0.6),
+	Size = UDim2.fromOffset(640, 40),
+	TextColor3 = C.green,
+	ZIndex = 51,
+	Parent = deathOverlay,
+})
+
+-- 사망 연출: 미수령 트로피가 한꺼번에 사라지는 모습을 확실히 보여줍니다
+local function showDeath(info)
+	Menus.CloseAll()
+	Effects.PlayDeath()
+	Effects.Shake(1)
+	deathOverlay.Visible = true
+	deathOverlay.BackgroundTransparency = 0.35
+	deathTitle.TextTransparency = 0
+	deathLost.TextTransparency = 0
+	deathLost.TextColor3 = C.gold
+	deathKept.Text = (info.kept or 0) > 0 and ("🛡️ 사망 보험으로 " .. Format.Short(info.kept) .. " 지켰어요") or ""
+
+	local lost = info.lost or 0
+	if lost > 0 then
+		deathLost.Text = "💰 미수령 트로피 " .. Format.Short(lost)
+		task.wait(0.6)
+		local steps = 20
+		for i = steps - 1, 0, -1 do
+			deathLost.Text = "💰 미수령 트로피 " .. Format.Short(math.floor(lost * i / steps))
+			task.wait(0.04)
+		end
+		deathLost.TextColor3 = C.red
+		deathLost.Text = "-" .. Format.Short(lost) .. " 트로피 전부 사라졌다…"
+		Ui.Pop(deathLost, 1.4)
+	else
+		deathLost.Text = "스테이지 " .. (info.stage or 1) .. "에서 쓰러졌어요"
+	end
+
+	task.wait(1.6)
+	local fade = TweenInfo.new(0.8)
+	TweenService:Create(deathOverlay, fade, { BackgroundTransparency = 1 }):Play()
+	TweenService:Create(deathTitle, fade, { TextTransparency = 1 }):Play()
+	TweenService:Create(deathLost, fade, { TextTransparency = 1 }):Play()
+	task.wait(0.8)
+	deathOverlay.Visible = false
+end
+
+Menus.Init(screen, ActionRemote)
+
+-- 로비 표지판을 내 상태에 맞게 (구매한 발판, 잠긴 허수아비/월드) -------------------------------------
+
+local lobby
+
+local function updateLobby()
+	if not lobby then
+		return
+	end
+	local ownedPad = State.Get("Pad")
+	local trophies = State.Get("Trophies")
+	local pads = lobby:FindFirstChild("Pads")
+	for _, padPart in ipairs(pads and pads:GetChildren() or {}) do
+		local index = padPart:GetAttribute("PadIndex")
+		local pad = index and Config.Pads[index]
+		local label = padPart:FindFirstChild("Sign") and padPart.Sign:FindFirstChild("Label")
+		if pad and label then
+			if index <= ownedPad then
+				label.Text = "✔ +" .. Format.Short(pad.value)
+				padPart.Color = C.green
+			else
+				label.Text = "+" .. Format.Short(pad.value) .. "\n🏆 " .. Format.Short(pad.cost)
+				padPart.Color = trophies >= pad.cost and C.gold or C.disabled
+			end
+		end
+	end
+
+	local dummies = lobby:FindFirstChild("Dummies")
+	for _, model in ipairs(dummies and dummies:GetChildren() or {}) do
+		local info = Config.Dummies[model:GetAttribute("Tier") or 0]
+		local head = model:FindFirstChild("Head")
+		local label = head and head:FindFirstChild("Sign") and head.Sign:FindFirstChild("Label")
+		if info and label then
+			local locked = info.pass and not State.OwnsPass(info.pass)
+			label.Text = (locked and "🔒 " or "") .. info.name .. "\n훈련 x" .. info.mult
+		end
+	end
+
+	local portals = lobby:FindFirstChild("Portals")
+	local level = State.Get("Level")
+	for world, info in ipairs(Config.Worlds) do
+		local model = portals and portals:FindFirstChild("World" .. world)
+		local top = model and model:FindFirstChild("Top")
+		local label = top and top:FindFirstChild("Sign") and top.Sign:FindFirstChild("PortalLabel")
+		if label then
+			local status = level >= info.level and "▶ 출발!" or ("🔒 Lv " .. info.level .. " 필요")
+			label.Text = "월드 " .. world .. " · " .. info.name .. "\n" .. status
+		end
+	end
+end
+
+task.spawn(function()
+	lobby = workspace:WaitForChild("Lobby", 30)
+	if lobby then
+		lobby:WaitForChild("Pads", 10)
+		lobby:WaitForChild("Portals", 10)
+		updateLobby()
+	end
+end)
+
+-- 화면 갱신 ----------------------------------------------------------------------------------
+
+local lastUnbanked = 0
+
+local function refresh()
+	local speed = State.Get("Speed")
+	local level = math.max(1, State.Get("Level"))
+	local rebirths = State.Get("Rebirths")
+	local stage = State.Get("Stage")
+	local world = State.Get("World")
+	local inRun = stage > 0 and Config.Worlds[world] ~= nil
+
+	trophyLabel.Text = "🏆 " .. Format.Short(State.Get("Trophies"))
+
+	speedLabel.Text = "⚡ " .. Format.Short(speed) .. "  (+" .. Format.Short(State.Gain()) .. ")"
+	local current, nextSpeed = Config.SpeedForLevel(level), Config.SpeedForLevel(level + 1)
+	levelFill.Size = UDim2.fromScale(math.clamp((speed - current) / math.max(1, nextSpeed - current), 0, 1), 1)
+	levelText.Text = "Lv " .. level .. "  ·  다음까지 " .. Format.Short(math.max(0, nextSpeed - speed))
+
+	local need = Config.RebirthLevel(rebirths)
+	rebirthCaption.Text = "Lv " .. level .. "/" .. need
+	rebirthBadge.Visible = level >= need and not inRun
+
+	local giftLeft = State.Get("LastGift") + Config.GiftCooldown - os.time()
+	giftBadge.Visible = giftLeft <= 0
+	giftCaption.Text = giftLeft <= 0 and "선물!" or string.format("%d:%02d", giftLeft // 3600, (giftLeft % 3600) // 60)
+
+	local eventMult = State.EventMultiplier()
+	eventBanner.Visible = eventMult > 1
+	if eventMult > 1 then
+		local left = (workspace:GetAttribute("EventEnds") or 0) - os.time()
+		eventLabel.Text = string.format("⚡ 운영자 이벤트! 속도 x%s · %d:%02d", Format.Short(eventMult), left // 60, left % 60)
+	end
+
+	runPanel.Visible = inRun
+	runPanel.Position = UDim2.new(0.5, 0, 0, eventMult > 1 and 116 or 72)
+	if inRun then
+		local enemiesLeft = State.Get("EnemiesLeft")
+		stageLabel.Text = "월드 " .. world .. " · 스테이지 " .. stage .. "/" .. Config.StagesPerWorld .. "  ·  " .. (enemiesLeft > 0 and ("👾 " .. enemiesLeft) or "🚪 출구 열림")
+		local recommended = Config.RecommendedLevel(world, stage)
+		recommendedLabel.Text = "권장 Lv " .. Format.Short(recommended) .. "  (내 Lv " .. level .. ")"
+		recommendedLabel.TextColor3 = level >= recommended and Color3.fromRGB(170, 255, 170) or Color3.fromRGB(255, 150, 150)
+		if enemiesLeft > 0 then
+			runHint.Text = "미수령 트로피 · 죽으면 전부 사라져요!"
+		end
+	end
+	local unbanked = State.Get("Unbanked")
+	unbankedLabel.Text = "💰 " .. Format.Short(unbanked)
+	if unbanked > lastUnbanked then
+		Ui.Pop(unbankedLabel, 1.4)
+	end
+	lastUnbanked = unbanked
+end
+
+local LOBBY_KEYS = { Pad = true, Trophies = true, Level = true, PassesJson = true }
+
+State.OnChanged(function(name)
+	refresh()
+	if name then
+		Menus.OnAttributeChanged(name)
+		if LOBBY_KEYS[name] then
+			updateLobby()
+		end
+	end
+end)
 refresh()
 
--- 던지기 ---------------------------------------------------------------------
+-- 선물/이벤트 시간 표시를 위해 1초마다 갱신
+task.spawn(function()
+	while true do
+		task.wait(1)
+		refresh()
+	end
+end)
+
+-- 던지기 ------------------------------------------------------------------------------------
 
 local lastThrow = 0
 
@@ -2002,7 +2856,7 @@ local function tryThrow()
 		return
 	end
 	local now = os.clock()
-	if now - lastThrow < 1 / Config.ThrowsPerSecond(attr("Speed")) then
+	if now - lastThrow < 1 / Config.ThrowsPerSecond(State.Get("Speed")) then
 		return
 	end
 	lastThrow = now
@@ -2022,181 +2876,924 @@ UserInputService.InputBegan:Connect(function(input, processed)
 end)
 
 autoButton.Activated:Connect(function()
+	if not State.CanAutoThrow() then
+		ActionRemote:FireServer("buyPass", "AutoThrow")
+		return
+	end
 	autoOn = not autoOn
-	autoButton.Text = autoOn and "자동: 켬" or "자동: 끔"
-	autoButton.BackgroundColor3 = autoOn and COLORS.green or COLORS.disabled
+	autoCaption.Text = autoOn and "자동 켬" or "자동 끔"
+	autoButton.BackgroundColor3 = autoOn and C.green or C.disabled
 end)
 
 task.spawn(function()
 	while true do
-		task.wait(1 / Config.ThrowsPerSecond(attr("Speed")))
-		if autoOn and Config.FreeAutoThrow then
+		task.wait(1 / Config.ThrowsPerSecond(State.Get("Speed")))
+		if autoOn and State.CanAutoThrow() then
 			tryThrow()
 		end
 	end
 end)
 
-ThrowFx.OnClientEvent:Connect(function(thrower, from, to, damage, gain)
+ThrowFx.OnClientEvent:Connect(function(thrower, from, to, damage, gain, skinId)
 	local mine = thrower == player
 	if mine then
 		Effects.PlayThrow()
 	end
-	Effects.Throw(from, to, function()
+	Effects.Throw(from, to, skinId, function()
 		if damage then
 			Effects.Burst(to)
 			if mine then
-				Effects.Popup(to, Format.Short(damage), COLORS.gold, 1)
+				Effects.Popup(to, Format.Short(damage), C.gold, 1)
 				Effects.PlayHit()
 				Effects.Shake(0.15)
 			end
 		elseif mine then
-			Effects.Popup(to, "+" .. Format.Short(gain) .. " ⚡", COLORS.speed, 0.8)
+			Effects.Popup(to, "+" .. Format.Short(gain) .. " ⚡", C.speed, 0.8)
 		end
 	end)
 end)
 
--- 강화 / 환생 버튼 --------------------------------------------------------------
-
-upgradeButton.Activated:Connect(function()
-	ActionRemote:FireServer("upgrade")
-end)
-
-rebirthButton.Activated:Connect(function()
-	if attr("Stage") > 0 or attr("Level") < Config.RebirthLevel(attr("Rebirths")) then
-		return
-	end
-	-- 실수로 누르지 않게 두 번 눌러야 환생합니다
-	if os.clock() < rebirthConfirmUntil then
-		rebirthConfirmUntil = 0
-		ActionRemote:FireServer("rebirth")
-	else
-		rebirthConfirmUntil = os.clock() + 3
-		task.delay(3.05, refresh)
-	end
-	refresh()
-end)
-
--- 귀환 / 전진 ------------------------------------------------------------------
-
-local function hideChoice()
-	choicePanel.Visible = false
-end
-
-stopButton.Activated:Connect(function()
-	hideChoice()
-	ActionRemote:FireServer("choice", "stop")
-end)
-
-goButton.Activated:Connect(function()
-	hideChoice()
-	ActionRemote:FireServer("choice", "go")
-end)
-
-local function showChoice(info)
-	choiceReward.Text = "스테이지 보상 +" .. Format.Short(info.reward) .. " 🏆"
-	choiceTotal.Text = "💰 미수령 합계 " .. Format.Short(info.unbanked)
-	stopButton.Text = "🏠 귀환\n" .. Format.Short(info.unbanked) .. " 받기"
-	if info.canGo then
-		choiceTitle.Text = "🎉 스테이지 " .. info.stage .. " 클리어!"
-		choiceWarning.Text = "다음: 스테이지 "
-			.. info.nextStage
-			.. " (권장 Lv "
-			.. info.nextRecommended
-			.. ")\n죽으면 미수령 트로피를 전부 잃어요!"
-		goButton.Text = "➡ 전진!\n스테이지 " .. info.nextStage
-		goButton.Visible = true
-		stopButton.AnchorPoint = Vector2.new(0, 1)
-		stopButton.Position = UDim2.new(0, 0, 1, 0)
-	else
-		choiceTitle.Text = "🏆 " .. Config.WorldName .. " 클리어!"
-		choiceWarning.Text = "마지막 스테이지까지 깼어요!\n귀환해서 트로피를 받으세요"
-		goButton.Visible = false
-		stopButton.AnchorPoint = Vector2.new(0.5, 1)
-		stopButton.Position = UDim2.new(0.5, 0, 1, 0)
-	end
-	choicePanel.Visible = true
-	pop(choicePanel, 0.8)
-end
-
--- 사망 연출: 미수령 트로피가 한꺼번에 사라지는 모습을 확실히 보여줍니다
-local function showDeath(info)
-	hideChoice()
-	Effects.PlayDeath()
-	Effects.Shake(1)
-	deathOverlay.Visible = true
-	deathOverlay.BackgroundTransparency = 0.35
-	deathTitle.TextTransparency = 0
-	deathLost.TextTransparency = 0
-	deathLost.TextColor3 = COLORS.gold
-
-	local lost = info.lost or 0
-	if lost > 0 then
-		deathLost.Text = "💰 미수령 트로피 " .. Format.Short(lost)
-		task.wait(0.6)
-		-- 숫자가 0까지 줄어듭니다
-		local steps = 20
-		for i = steps - 1, 0, -1 do
-			deathLost.Text = "💰 미수령 트로피 " .. Format.Short(math.floor(lost * i / steps))
-			task.wait(0.04)
-		end
-		deathLost.TextColor3 = COLORS.red
-		deathLost.Text = "-" .. Format.Short(lost) .. " 트로피 전부 사라졌다…"
-		pop(deathLost, 1.4)
-	else
-		deathLost.Text = "스테이지 " .. (info.stage or 1) .. "에서 쓰러졌어요"
-	end
-
-	task.wait(1.6)
-	local fade = TweenInfo.new(0.8)
-	TweenService:Create(deathOverlay, fade, { BackgroundTransparency = 1 }):Play()
-	TweenService:Create(deathTitle, fade, { TextTransparency = 1 }):Play()
-	TweenService:Create(deathLost, fade, { TextTransparency = 1 }):Play()
-	task.wait(0.8)
-	deathOverlay.Visible = false
-end
-
--- 서버 알림 ------------------------------------------------------------------
+-- 서버 알림 ----------------------------------------------------------------------------------
 
 Notify.OnClientEvent:Connect(function(kind, info)
 	info = info or {}
 	if kind == "toast" then
 		showToast(info.text, info.color)
 	elseif kind == "levelUp" then
-		showToast("⭐ 레벨 업! Lv " .. info.level, COLORS.speed)
+		showToast("⭐ 레벨 업! Lv " .. info.level, C.speed)
 		Effects.PlayLevelUp()
-		pop(levelLabel, 1.3)
+		Ui.Pop(levelBar, 1.2)
 		local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
 		if root then
-			Effects.Burst(root.Position, COLORS.speed)
+			Effects.Burst(root.Position, C.speed)
 		end
 	elseif kind == "stageStart" then
-		hideChoice()
-		showToast("스테이지 " .. info.stage .. " 시작! 적을 전부 쓰러뜨리세요", COLORS.text)
-	elseif kind == "exitOpen" then
-		showToast("🚪 출구가 열렸어요! 끝의 초록 발판으로 가세요", COLORS.green)
+		Menus.CloseAll()
+		showToast("월드 " .. info.world .. " · 스테이지 " .. info.stage .. " 시작! 적을 전부 쓰러뜨리세요", C.text)
 	elseif kind == "cleared" then
-		showChoice(info)
+		showToast("🎉 스테이지 " .. info.stage .. " 클리어! 미수령 +" .. Format.Short(info.reward), C.gold)
+		if info.isLast then
+			runHint.Text = "👑 월드 클리어! 🟡 노란 발판에서 트로피 받기"
+		else
+			runHint.Text = "🟡 귀환 = 받기 · 🟢 전진 = 권장 Lv " .. Format.Short(info.nextRecommended)
+		end
 	elseif kind == "banked" then
 		if (info.amount or 0) > 0 then
-			showToast("🏆 트로피 +" .. Format.Short(info.amount) .. " 받았어요!", COLORS.gold)
-			pop(trophyLabel, 1.4)
+			showToast("🏆 트로피 +" .. Format.Short(info.amount) .. " 받았어요!", C.gold)
+			Ui.Pop(trophyPill, 1.3)
 		end
 	elseif kind == "death" then
 		task.spawn(showDeath, info)
 	elseif kind == "hurt" then
 		Effects.Shake(0.5)
 	elseif kind == "rebirth" then
-		showToast("🔁 환생 완료! 이제 속도 x" .. info.multiplier, Color3.fromRGB(220, 180, 255))
+		Menus.CloseAll()
+		showToast("🔁 환생 완료! 이제 속도 x" .. Format.Short(info.multiplier), Color3.fromRGB(220, 180, 255))
+		Effects.PlayLevelUp()
+	elseif kind == "newSkin" then
+		showReward("✨ 새 " .. Config.BallName .. "!", info.id)
+	elseif kind == "gift" then
+		showToast("🎁 선물! 속도 +" .. Format.Short(info.speed), C.pink)
 		Effects.PlayLevelUp()
 	end
 end)
 ]]></string>
           </Properties>
         </Item>
+        <Item class="ModuleScript" referent="15">
+          <Properties>
+            <string name="Name">Menus</string>
+            <string name="Source"><![CDATA[--[[
+	창(메뉴): 상점(왁뿌볼/오라/게임패스), 텔레포트, 코드, 환생
+]]
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared:WaitForChild("Config"))
+local Format = require(Shared:WaitForChild("Format"))
+local Ui = require(script.Parent:WaitForChild("Ui"))
+local State = require(script.Parent:WaitForChild("State"))
+
+local C = Ui.Colors
+local create = Ui.Create
+
+local Menus = {}
+
+local windows = {} -- [name] = { frame, refresh }
+local ActionRemote
+
+local function clearGrid(grid)
+	for _, child in ipairs(grid:GetChildren()) do
+		if child:IsA("GuiObject") then
+			child:Destroy()
+		end
+	end
+end
+
+-- 상점 카드 하나
+local function card(grid, order, info)
+	local frame = Ui.Panel({
+		Name = "Card" .. order,
+		LayoutOrder = order,
+		BackgroundColor3 = C.panelLight,
+		BackgroundTransparency = 0,
+		Parent = grid,
+	})
+	if info.highlight then
+		local stroke = frame:FindFirstChildOfClass("UIStroke")
+		stroke.Color = C.gold
+		stroke.Thickness = 4
+	end
+
+	local rarity = info.rarity and Config.Rarities[info.rarity]
+	if rarity then
+		local strip = create("Frame", {
+			Size = UDim2.new(1, 0, 0, 24),
+			BackgroundColor3 = rarity.color,
+			Parent = frame,
+		}, { Ui.Corner(14) })
+		Ui.Text({ Size = UDim2.fromScale(1, 1), Text = rarity.name, Parent = strip })
+	end
+
+	if info.color then
+		local ball = create("Frame", {
+			AnchorPoint = Vector2.new(0.5, 0),
+			Position = UDim2.new(0.5, 0, 0, 32),
+			Size = UDim2.fromOffset(62, 62),
+			BackgroundColor3 = info.color,
+			Parent = frame,
+		}, { Ui.Round(), Ui.Outline(3), Ui.Shine() })
+		if info.ring then
+			ball.BackgroundTransparency = 0.7
+			ball:FindFirstChildOfClass("UIStroke").Color = info.color
+			ball:FindFirstChildOfClass("UIStroke").Thickness = 6
+		end
+		if info.rainbow then
+			create("UIGradient", {
+				Color = ColorSequence.new({
+					ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 80, 80)),
+					ColorSequenceKeypoint.new(0.33, Color3.fromRGB(255, 230, 80)),
+					ColorSequenceKeypoint.new(0.66, Color3.fromRGB(80, 220, 255)),
+					ColorSequenceKeypoint.new(1, Color3.fromRGB(200, 90, 255)),
+				}),
+				Rotation = 45,
+				Parent = ball,
+			})
+		end
+	else
+		Ui.Text({
+			AnchorPoint = Vector2.new(0.5, 0),
+			Position = UDim2.new(0.5, 0, 0, 30),
+			Size = UDim2.fromOffset(70, 64),
+			Text = info.icon or "?",
+			Parent = frame,
+		})
+	end
+
+	Ui.Text({ Position = UDim2.fromOffset(6, 100), Size = UDim2.new(1, -12, 0, 22), Text = info.title, Parent = frame })
+	Ui.Text({
+		Position = UDim2.fromOffset(6, 124),
+		Size = UDim2.new(1, -12, 0, 18),
+		Text = info.sub or "",
+		TextColor3 = C.speed,
+		Parent = frame,
+	})
+	Ui.Button({
+		AnchorPoint = Vector2.new(0.5, 1),
+		Position = UDim2.new(0.5, 0, 1, -6),
+		Size = UDim2.new(1, -12, 0, 36),
+		BackgroundColor3 = info.buttonColor,
+		Text = info.buttonText,
+		Parent = frame,
+	}, info.onClick)
+	return frame
+end
+
+local function send(...)
+	ActionRemote:FireServer(...)
+end
+
+-- 상점 ---------------------------------------------------------------------------------
+
+local function buildShop(screen)
+	local window, content, header = Ui.Window(screen, "🛒 상점", C.orange, UDim2.fromOffset(700, 480))
+	Ui.Button({
+		AnchorPoint = Vector2.new(1, 0.5),
+		Position = UDim2.new(1, -56, 0.5, 0),
+		Size = UDim2.fromOffset(160, 42),
+		BackgroundColor3 = C.green,
+		Text = "✅ 최강 장착",
+		ZIndex = 22,
+		Parent = header,
+	}, function()
+		send("equipBest")
+	end)
+
+	local grid = Ui.Grid(content, UDim2.fromOffset(146, 196), {
+		Position = UDim2.fromOffset(0, 54),
+		Size = UDim2.new(1, 0, 1, -54),
+	})
+	local currentTab = 1
+
+	local function fill()
+		clearGrid(grid)
+		local trophies = State.Get("Trophies")
+		if currentTab == 1 then
+			local equipped = State.Get("Skin")
+			for order, skin in ipairs(Config.Skins) do
+				local owned = State.OwnsSkin(skin)
+				local text, color = "", C.disabled
+				if owned and equipped == skin.id then
+					text, color = "장착됨", C.disabled
+				elseif owned then
+					text, color = "장착", C.green
+				elseif skin.boss then
+					text, color = "👑 월드" .. skin.boss .. " 보스", C.purple
+				elseif skin.pass then
+					text, color = "R$ " .. Config.GamePasses[skin.pass].robux, C.green
+				else
+					text, color = "🏆 " .. Format.Short(skin.cost), trophies >= skin.cost and C.gold or C.disabled
+				end
+				card(grid, order, {
+					title = skin.name,
+					sub = "속도 x" .. Format.Short(skin.mult),
+					rarity = skin.rarity,
+					color = skin.color,
+					rainbow = skin.rainbow,
+					highlight = equipped == skin.id,
+					buttonText = text,
+					buttonColor = color,
+					onClick = function()
+						send(owned and "equipSkin" or "buySkin", skin.id)
+					end,
+				})
+			end
+		elseif currentTab == 2 then
+			local equipped = State.Get("Aura")
+			for order, aura in ipairs(Config.Auras) do
+				local owned = State.OwnsAura(aura)
+				local text, color
+				if owned and equipped == aura.id then
+					text, color = "해제", C.disabled
+				elseif owned then
+					text, color = "장착", C.green
+				else
+					text, color = "🏆 " .. Format.Short(aura.cost), trophies >= aura.cost and C.gold or C.disabled
+				end
+				card(grid, order, {
+					title = aura.name,
+					sub = "속도 x" .. Format.Short(aura.mult),
+					rarity = aura.rarity,
+					color = aura.color,
+					ring = true,
+					highlight = equipped == aura.id,
+					buttonText = text,
+					buttonColor = color,
+					onClick = function()
+						if owned then
+							send("equipAura", equipped == aura.id and "" or aura.id)
+						else
+							send("buyAura", aura.id)
+						end
+					end,
+				})
+			end
+		else
+			for order, key in ipairs(Config.PassOrder) do
+				local pass = Config.GamePasses[key]
+				local owned = State.OwnsPass(key)
+				card(grid, order, {
+					title = pass.name,
+					sub = pass.desc,
+					icon = pass.icon,
+					highlight = owned,
+					buttonText = owned and "보유 중" or ("R$ " .. pass.robux),
+					buttonColor = owned and C.disabled or C.green,
+					onClick = function()
+						if not owned then
+							send("buyPass", key)
+						end
+					end,
+				})
+			end
+		end
+	end
+
+	local _, selectTab = Ui.Tabs(content, { "🎾 왁뿌볼", "✨ 오라", "💎 게임패스" }, function(index)
+		currentTab = index
+		fill()
+	end)
+	selectTab(1)
+
+	return { frame = window, refresh = fill }
+end
+
+-- 텔레포트 ------------------------------------------------------------------------------
+
+local function buildTeleport(screen)
+	local window, content = Ui.Window(screen, "🌀 텔레포트", C.purple, UDim2.fromOffset(700, 480))
+	local grid = Ui.Grid(content, UDim2.fromOffset(118, 92), {
+		Position = UDim2.fromOffset(0, 54),
+		Size = UDim2.new(1, 0, 1, -54),
+	})
+	local lockLabel = Ui.Text({
+		Position = UDim2.fromOffset(0, 120),
+		Size = UDim2.new(1, 0, 0, 90),
+		Visible = false,
+		ZIndex = 22,
+		Parent = content,
+	})
+	local currentWorld = 1
+
+	local function fill()
+		clearGrid(grid)
+		local world = Config.Worlds[currentWorld]
+		local level = State.Get("Level")
+		lockLabel.Visible = level < world.level
+		if level < world.level then
+			lockLabel.Text = "🔒 월드 " .. currentWorld .. " · " .. world.name .. "\n레벨 " .. world.level .. "부터 갈 수 있어요"
+			return
+		end
+		local best = State.BestStage(currentWorld)
+		local trophies = State.Get("Trophies")
+		for stage = 1, Config.StagesPerWorld do
+			local reachable = stage <= best + 1
+			local cost = Config.TeleportCost(currentWorld, stage)
+			local text, color
+			if not reachable then
+				text, color = "🔒\n스테이지 " .. stage, C.disabled
+			else
+				local price = cost == 0 and "무료" or ("🏆 " .. Format.Short(cost))
+				text = "스테이지 " .. stage .. "\n" .. price
+				color = trophies >= cost and (stage == Config.StagesPerWorld and C.red or C.blue) or C.disabled
+			end
+			Ui.Button({
+				Name = "Stage" .. stage,
+				LayoutOrder = stage,
+				BackgroundColor3 = color,
+				Text = text,
+				Parent = grid,
+			}, function()
+				if reachable then
+					send("teleport", currentWorld, stage)
+					window.Visible = false
+				end
+			end)
+		end
+	end
+
+	local tabNames = {}
+	for index in ipairs(Config.Worlds) do
+		tabNames[index] = "🌍 월드 " .. index
+	end
+	local _, selectTab = Ui.Tabs(content, tabNames, function(index)
+		currentWorld = index
+		fill()
+	end)
+	selectTab(1)
+
+	return { frame = window, refresh = fill }
+end
+
+-- 코드 ---------------------------------------------------------------------------------
+
+local function buildCodes(screen)
+	local window, content = Ui.Window(screen, "🎟️ 코드", C.blue, UDim2.fromOffset(480, 280))
+	local box = create("TextBox", {
+		Size = UDim2.new(1, 0, 0, 64),
+		BackgroundColor3 = Color3.fromRGB(245, 245, 250),
+		Font = Enum.Font.FredokaOne,
+		TextScaled = true,
+		TextColor3 = Color3.fromRGB(40, 40, 60),
+		PlaceholderText = "코드를 입력하세요",
+		Text = "",
+		ClearTextOnFocus = false,
+		ZIndex = 22,
+		Parent = content,
+	}, { Ui.Corner(12), Ui.Outline(3), Ui.Padding(10) })
+	Ui.Button({
+		AnchorPoint = Vector2.new(0.5, 1),
+		Position = UDim2.new(0.5, 0, 1, 0),
+		Size = UDim2.new(0.6, 0, 0, 60),
+		BackgroundColor3 = C.green,
+		Text = "사용하기",
+		ZIndex = 22,
+		Parent = content,
+	}, function()
+		if box.Text ~= "" then
+			send("code", box.Text)
+			box.Text = ""
+		end
+	end)
+	return { frame = window, refresh = function() end }
+end
+
+-- 환생 ---------------------------------------------------------------------------------
+
+local function buildRebirth(screen)
+	local window, content = Ui.Window(screen, "🔁 환생", C.red, UDim2.fromOffset(520, 420))
+	local info = Ui.Text({
+		Size = UDim2.new(1, 0, 0, 230),
+		Text = "",
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextYAlignment = Enum.TextYAlignment.Top,
+		RichText = true,
+		ZIndex = 22,
+		Parent = content,
+	})
+	local button = Ui.Button({
+		AnchorPoint = Vector2.new(0.5, 1),
+		Position = UDim2.new(0.5, 0, 1, 0),
+		Size = UDim2.new(0.8, 0, 0, 70),
+		BackgroundColor3 = C.red,
+		Text = "🔁 환생하기",
+		ZIndex = 22,
+		Parent = content,
+	}, function()
+		send("rebirth")
+	end)
+
+	local function refresh()
+		local rebirths = State.Get("Rebirths")
+		local level = State.Get("Level")
+		local need = Config.RebirthLevel(rebirths)
+		local ready = level >= need
+		info.Text = string.format(
+			'환생 <font color="#FFCD3C">%d회 → %d회</font>\n속도 배수 <font color="#6EE1FF">x%s → x%s</font>\n필요 레벨 <font color="%s">Lv %d</font> (지금 Lv %d)\n\n초기화: 속도, 레벨\n유지: 트로피, 왁뿌볼, 오라, 던지기 파워',
+			rebirths,
+			rebirths + 1,
+			Format.Short(Config.RebirthMultiplier(rebirths)),
+			Format.Short(Config.RebirthMultiplier(rebirths + 1)),
+			ready and "#78FF8C" or "#FF7878",
+			need,
+			level
+		)
+		button.BackgroundColor3 = ready and C.red or C.disabled
+		button.Label.Text = ready and "🔁 환생하기" or ("Lv " .. need .. " 필요")
+	end
+	return { frame = window, refresh = refresh }
+end
+
+-- 바깥에서 쓰는 함수 --------------------------------------------------------------------
+
+function Menus.Init(screen, actionRemote)
+	ActionRemote = actionRemote
+	windows.shop = buildShop(screen)
+	windows.teleport = buildTeleport(screen)
+	windows.codes = buildCodes(screen)
+	windows.rebirth = buildRebirth(screen)
+end
+
+function Menus.Toggle(name)
+	local target = windows[name]
+	local opening = not target.frame.Visible
+	for _, window in pairs(windows) do
+		window.frame.Visible = false
+	end
+	if opening then
+		target.refresh()
+		target.frame.Visible = true
+		Ui.Pop(target.frame, 0.85)
+	end
+end
+
+function Menus.CloseAll()
+	for _, window in pairs(windows) do
+		window.frame.Visible = false
+	end
+end
+
+-- 창에 보이는 값이 바뀌었을 때만 다시 그립니다 (속도는 너무 자주 바뀌어서 제외)
+local WATCHED = {
+	Trophies = true,
+	Skin = true,
+	Aura = true,
+	SkinsJson = true,
+	AurasJson = true,
+	PassesJson = true,
+	BestStagesJson = true,
+	Level = true,
+	Rebirths = true,
+}
+
+function Menus.OnAttributeChanged(name)
+	if not WATCHED[name] then
+		return
+	end
+	for _, window in pairs(windows) do
+		if window.frame.Visible then
+			window.refresh()
+		end
+	end
+end
+
+return Menus
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="16">
+          <Properties>
+            <string name="Name">State</string>
+            <string name="Source"><![CDATA[--[[
+	내 정보 읽기 (서버가 플레이어 속성으로 보내주는 값)
+]]
+
+local Players = game:GetService("Players")
+local HttpService = game:GetService("HttpService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config"))
+
+local player = Players.LocalPlayer
+
+local State = {}
+
+local DEFAULTS = { Pad = 1, Level = 1, Skin = "basic", Aura = "" }
+
+function State.Get(name)
+	local value = player:GetAttribute(name)
+	if value == nil then
+		return DEFAULTS[name] or 0
+	end
+	return value
+end
+
+local jsonCache = {}
+
+-- 표 값 (Skins, Auras, BestStages, Passes)
+function State.Json(name)
+	local raw = player:GetAttribute(name .. "Json")
+	if raw == nil then
+		return {}
+	end
+	local cached = jsonCache[name]
+	if cached and cached.raw == raw then
+		return cached.value
+	end
+	local ok, value = pcall(function()
+		return HttpService:JSONDecode(raw)
+	end)
+	value = ok and type(value) == "table" and value or {}
+	jsonCache[name] = { raw = raw, value = value }
+	return value
+end
+
+function State.OwnsPass(key)
+	return key ~= nil and State.Json("Passes")[key] == true
+end
+
+function State.OwnsSkin(skin)
+	return skin.id == "basic" or State.Json("Skins")[skin.id] == true or State.OwnsPass(skin.pass)
+end
+
+function State.OwnsAura(aura)
+	return State.Json("Auras")[aura.id] == true
+end
+
+function State.BestStage(world)
+	return tonumber(State.Json("BestStages")[world]) or 0
+end
+
+function State.EventMultiplier()
+	if (workspace:GetAttribute("EventEnds") or 0) > os.time() then
+		return workspace:GetAttribute("EventMult") or 1
+	end
+	return 1
+end
+
+function State.Context()
+	return {
+		pad = State.Get("Pad"),
+		rebirths = State.Get("Rebirths"),
+		skin = State.Get("Skin"),
+		aura = State.Get("Aura"),
+		doubleSpeed = State.OwnsPass("DoubleSpeed"),
+		eventMult = State.EventMultiplier(),
+	}
+end
+
+function State.Gain()
+	return Config.GainPerThrow(State.Context())
+end
+
+function State.CanAutoThrow()
+	return Config.FreeAutoThrow or State.OwnsPass("AutoThrow")
+end
+
+-- 값이 바뀔 때마다 부릅니다
+function State.OnChanged(callback)
+	player.AttributeChanged:Connect(callback)
+	workspace:GetAttributeChangedSignal("EventMult"):Connect(callback)
+	workspace:GetAttributeChangedSignal("EventEnds"):Connect(callback)
+end
+
+return State
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="17">
+          <Properties>
+            <string name="Name">Ui</string>
+            <string name="Source"><![CDATA[--[[
+	UI 만들기 도구 모음 (시뮬레이터 게임 스타일: 굵은 테두리, 통통한 버튼, 큰 글씨)
+]]
+
+local TweenService = game:GetService("TweenService")
+
+local Ui = {}
+
+Ui.Colors = {
+	panel = Color3.fromRGB(32, 28, 52),
+	panelLight = Color3.fromRGB(55, 48, 85),
+	text = Color3.fromRGB(255, 255, 255),
+	speed = Color3.fromRGB(110, 225, 255),
+	gold = Color3.fromRGB(255, 205, 60),
+	green = Color3.fromRGB(70, 205, 100),
+	orange = Color3.fromRGB(255, 140, 50),
+	red = Color3.fromRGB(235, 70, 80),
+	purple = Color3.fromRGB(150, 90, 245),
+	pink = Color3.fromRGB(255, 110, 180),
+	blue = Color3.fromRGB(70, 150, 255),
+	disabled = Color3.fromRGB(105, 105, 120),
+	outline = Color3.fromRGB(20, 15, 35),
+}
+
+local C = Ui.Colors
+
+function Ui.Create(className, props, children)
+	local instance = Instance.new(className)
+	for key, value in pairs(props or {}) do
+		if key ~= "Parent" then
+			instance[key] = value
+		end
+	end
+	for _, child in ipairs(children or {}) do
+		child.Parent = instance
+	end
+	if props and props.Parent then
+		instance.Parent = props.Parent
+	end
+	return instance
+end
+
+local create = Ui.Create
+
+function Ui.Corner(radius)
+	return create("UICorner", { CornerRadius = UDim.new(0, radius or 12) })
+end
+
+function Ui.Round()
+	return create("UICorner", { CornerRadius = UDim.new(1, 0) })
+end
+
+function Ui.Outline(thickness, color)
+	return create("UIStroke", {
+		Color = color or C.outline,
+		Thickness = thickness or 3,
+		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+	})
+end
+
+function Ui.Padding(pixels)
+	local p = UDim.new(0, pixels)
+	return create("UIPadding", { PaddingLeft = p, PaddingRight = p, PaddingTop = p, PaddingBottom = p })
+end
+
+-- 위는 밝고 아래는 어두운 버튼 그라데이션
+function Ui.Shine()
+	return create("UIGradient", {
+		Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(190, 190, 190)),
+		Rotation = 90,
+	})
+end
+
+-- 글자 테두리가 있는 라벨
+function Ui.Text(props)
+	local strokeThickness = props.TextStroke or 2
+	props.TextStroke = nil
+	props.BackgroundTransparency = props.BackgroundTransparency or 1
+	props.Font = props.Font or Enum.Font.FredokaOne
+	props.TextColor3 = props.TextColor3 or C.text
+	if props.TextScaled == nil then
+		props.TextScaled = true
+	end
+	local label = create("TextLabel", props)
+	create("UIStroke", { Color = C.outline, Thickness = strokeThickness, Parent = label })
+	return label
+end
+
+-- 통통한 버튼
+function Ui.Button(props, onClick)
+	local color = props.BackgroundColor3 or C.blue
+	local button = create("TextButton", {
+		Name = props.Name or "Button",
+		AnchorPoint = props.AnchorPoint,
+		Position = props.Position,
+		Size = props.Size,
+		LayoutOrder = props.LayoutOrder,
+		BackgroundColor3 = color,
+		Text = "",
+		AutoButtonColor = true,
+		Visible = props.Visible ~= false,
+		ZIndex = props.ZIndex,
+		Parent = props.Parent,
+	}, { Ui.Corner(props.Radius or 14), Ui.Outline(3), Ui.Shine() })
+	local label = Ui.Text({
+		Name = "Label",
+		Size = UDim2.new(1, -12, 1, -8),
+		Position = UDim2.fromOffset(6, 4),
+		Text = props.Text or "",
+		TextColor3 = props.TextColor3,
+		ZIndex = props.ZIndex,
+		Parent = button,
+	})
+	if onClick then
+		button.Activated:Connect(onClick)
+	end
+	return button, label
+end
+
+-- 왼쪽/오른쪽 세로 줄에 들어가는 큰 아이콘 버튼 (아이콘 + 아래 이름)
+function Ui.IconButton(props, onClick)
+	local button = Ui.Button({
+		Name = props.Name,
+		Size = UDim2.fromOffset(78, 78),
+		LayoutOrder = props.LayoutOrder,
+		BackgroundColor3 = props.Color,
+		Text = props.Icon,
+		Parent = props.Parent,
+		Radius = 18,
+	}, onClick)
+	button.Label.Size = UDim2.new(1, -16, 0.62, 0)
+	button.Label.Position = UDim2.fromOffset(8, 4)
+	local caption = Ui.Text({
+		Name = "Caption",
+		AnchorPoint = Vector2.new(0.5, 1),
+		Position = UDim2.new(0.5, 0, 1, 10),
+		Size = UDim2.new(1, 14, 0, 26),
+		Text = props.Caption,
+		TextStroke = 3,
+		Parent = button,
+	})
+	-- 오른쪽 위 작은 빨간 알림 배지
+	local badge = Ui.Text({
+		Name = "Badge",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(1, -4, 0, 4),
+		Size = UDim2.fromOffset(30, 30),
+		BackgroundTransparency = 0,
+		BackgroundColor3 = C.red,
+		Text = "!",
+		Visible = false,
+		ZIndex = 3,
+		Parent = button,
+	})
+	Ui.Round().Parent = badge
+	return button, caption, badge
+end
+
+function Ui.Panel(props, children)
+	props.BackgroundColor3 = props.BackgroundColor3 or C.panel
+	props.BackgroundTransparency = props.BackgroundTransparency or 0.1
+	local frame = create("Frame", props, { Ui.Corner(16), Ui.Outline(3) })
+	for _, child in ipairs(children or {}) do
+		child.Parent = frame
+	end
+	return frame
+end
+
+-- 살짝 커졌다 돌아오는 효과
+function Ui.Pop(guiObject, size)
+	local scale = guiObject:FindFirstChild("PopScale") or create("UIScale", { Name = "PopScale", Parent = guiObject })
+	scale.Scale = size or 1.2
+	TweenService:Create(scale, TweenInfo.new(0.3, Enum.EasingStyle.Back), { Scale = 1 }):Play()
+end
+
+-- 가운데 뜨는 창 (제목줄, 닫기 버튼, 내용 영역)
+function Ui.Window(parent, title, color, size)
+	local window = Ui.Panel({
+		Name = title,
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.52),
+		Size = size or UDim2.fromOffset(660, 450),
+		BackgroundTransparency = 0,
+		Visible = false,
+		ZIndex = 20,
+		Parent = parent,
+	})
+	local header = create("Frame", {
+		Name = "Header",
+		Size = UDim2.new(1, 0, 0, 60),
+		BackgroundColor3 = color,
+		ZIndex = 21,
+		Parent = window,
+	}, { Ui.Corner(16), Ui.Shine() })
+	Ui.Text({
+		Name = "Title",
+		Position = UDim2.fromOffset(18, 8),
+		Size = UDim2.new(0.6, 0, 1, -16),
+		Text = title,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextStroke = 3,
+		ZIndex = 22,
+		Parent = header,
+	})
+	local close = Ui.Button({
+		Name = "Close",
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, 12, 0, -12),
+		Size = UDim2.fromOffset(52, 52),
+		BackgroundColor3 = C.red,
+		Text = "X",
+		ZIndex = 23,
+		Parent = window,
+	})
+	close.Activated:Connect(function()
+		window.Visible = false
+	end)
+	local content = create("Frame", {
+		Name = "Content",
+		Position = UDim2.fromOffset(14, 72),
+		Size = UDim2.new(1, -28, 1, -86),
+		BackgroundTransparency = 1,
+		ZIndex = 21,
+		Parent = window,
+	})
+	return window, content, header
+end
+
+-- 카드가 격자로 늘어서는 스크롤 영역
+function Ui.Grid(parent, cellSize, props)
+	local scroll = create("ScrollingFrame", {
+		Name = "Grid",
+		Position = props and props.Position or UDim2.new(),
+		Size = props and props.Size or UDim2.fromScale(1, 1),
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		ScrollBarThickness = 8,
+		AutomaticCanvasSize = Enum.AutomaticSize.Y,
+		CanvasSize = UDim2.new(),
+		ZIndex = 21,
+		Parent = parent,
+	})
+	create("UIGridLayout", {
+		CellSize = cellSize,
+		CellPadding = UDim2.fromOffset(10, 10),
+		SortOrder = Enum.SortOrder.LayoutOrder,
+		HorizontalAlignment = Enum.HorizontalAlignment.Center,
+		Parent = scroll,
+	})
+	create("UIPadding", { PaddingTop = UDim.new(0, 6), PaddingBottom = UDim.new(0, 6), Parent = scroll })
+	return scroll
+end
+
+-- 창 안의 탭 버튼 줄
+function Ui.Tabs(parent, names, onSelect)
+	local bar = create("Frame", {
+		Name = "Tabs",
+		Size = UDim2.new(1, 0, 0, 46),
+		BackgroundTransparency = 1,
+		ZIndex = 21,
+		Parent = parent,
+	})
+	create("UIListLayout", {
+		FillDirection = Enum.FillDirection.Horizontal,
+		Padding = UDim.new(0, 8),
+		SortOrder = Enum.SortOrder.LayoutOrder,
+		Parent = bar,
+	})
+	local buttons = {}
+	local function selectIndex(index)
+		for i, button in ipairs(buttons) do
+			button.BackgroundColor3 = i == index and C.gold or C.panelLight
+		end
+		onSelect(index)
+	end
+	for index, name in ipairs(names) do
+		buttons[index] = Ui.Button({
+			Name = "Tab" .. index,
+			Size = UDim2.fromOffset(150, 44),
+			LayoutOrder = index,
+			BackgroundColor3 = C.panelLight,
+			Text = name,
+			ZIndex = 22,
+			Parent = bar,
+		}, function()
+			selectIndex(index)
+		end)
+	end
+	return bar, selectIndex
+end
+
+return Ui
+]]></string>
+          </Properties>
+        </Item>
       </Item>
     </Item>
   </Item>
-  <Item class="Workspace" referent="14">
+  <Item class="Workspace" referent="18">
     <Properties>
       <string name="Name">Workspace</string>
       <bool name="NeedsPivotMigration">false</bool>

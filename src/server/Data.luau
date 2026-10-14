@@ -9,40 +9,60 @@ local DataStoreService = game:GetService("DataStoreService")
 
 local Data = {}
 
--- 저장되는 값들 (미수령 트로피는 저장하지 않습니다: 나가면 사라짐)
-Data.Keys = { "Speed", "Trophies", "BallUpgrade", "Rebirths", "BestStage" }
-
+-- 저장되는 값과 기본값 (미수령 트로피는 저장하지 않습니다)
 local DEFAULTS = {
 	Speed = 0,
 	Trophies = 0,
-	BallUpgrade = 0,
+	Pad = 1, -- 구매한 가장 높은 던지기 파워 발판 번호
 	Rebirths = 0,
-	BestStage = 0,
+	BestStages = { 0, 0, 0 }, -- 월드별 최고 클리어 스테이지
+	Skins = { basic = true },
+	Skin = "basic",
+	Auras = {},
+	Aura = "",
+	Codes = {},
+	LastGift = 0,
 }
 
-local STORE_NAME = "WakppuBall_v1"
+local STORE_NAME = "WakppuBall_v2"
 
-local store
+local store, topStore
 do
-	local ok, result = pcall(function()
-		return DataStoreService:GetDataStore(STORE_NAME)
+	local ok, err = pcall(function()
+		store = DataStoreService:GetDataStore(STORE_NAME)
+		topStore = DataStoreService:GetOrderedDataStore("TopSpeed_v2")
 	end)
-	if ok then
-		store = result
-	else
-		warn("[저장] DataStore를 쓸 수 없어서 이번 세션은 저장하지 않아요: " .. tostring(result))
+	if not ok then
+		store, topStore = nil, nil
+		warn("[저장] DataStore를 쓸 수 없어서 이번 세션은 저장하지 않아요: " .. tostring(err))
 	end
 end
 
--- 불러오기에 실패한 플레이어는 저장도 막아서, 기존 데이터를 빈 값으로 덮어쓰지 않게 합니다
+Data.TopStore = topStore
+
 local canSave = {}
 
 local function keyFor(player)
 	return "player_" .. player.UserId
 end
 
+local function deepCopy(value)
+	if type(value) ~= "table" then
+		return value
+	end
+	local copy = {}
+	for k, v in pairs(value) do
+		copy[k] = deepCopy(v)
+	end
+	return copy
+end
+
+function Data.Defaults()
+	return deepCopy(DEFAULTS)
+end
+
 function Data.Load(player)
-	local data = table.clone(DEFAULTS)
+	local data = deepCopy(DEFAULTS)
 	if not store then
 		return data
 	end
@@ -66,11 +86,16 @@ function Data.Load(player)
 	end
 
 	if type(saved) == "table" then
-		for _, key in ipairs(Data.Keys) do
-			if type(saved[key]) == "number" then
+		for key, default in pairs(DEFAULTS) do
+			if type(saved[key]) == type(default) then
 				data[key] = saved[key]
 			end
 		end
+		-- 월드가 늘어나도 칸이 모자라지 않게
+		for i = 1, #DEFAULTS.BestStages do
+			data.BestStages[i] = tonumber(data.BestStages[i]) or 0
+		end
+		data.Skins.basic = true
 	end
 	canSave[player] = true
 	return data
@@ -81,7 +106,7 @@ function Data.Save(player, data)
 		return
 	end
 	local payload = {}
-	for _, key in ipairs(Data.Keys) do
+	for key in pairs(DEFAULTS) do
 		payload[key] = data[key]
 	end
 	local ok, err = pcall(function()
@@ -89,6 +114,11 @@ function Data.Save(player, data)
 	end)
 	if not ok then
 		warn("[저장] " .. player.Name .. " 저장 실패: " .. tostring(err))
+	end
+	if topStore then
+		pcall(function()
+			topStore:SetAsync(tostring(player.UserId), math.floor(math.min(data.Speed, 2 ^ 52)))
+		end)
 	end
 end
 

@@ -18,3 +18,8 @@ globals:
   task: {any: true}
   warn: {any: true}
   table.clone: {args: [{type: table}]}
+  NumberSequence: {any: true}
+  NumberSequenceKeypoint: {any: true}
+  ColorSequence: {any: true}
+  ColorSequenceKeypoint: {any: true}
+  NumberRange: {any: true}
