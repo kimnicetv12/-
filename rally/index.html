@@ -1,0 +1,488 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Special Stage</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="실제 WRC 스테이지를 달리는 태블릿용 3D 랠리 시뮬레이터">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#101418">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans+KR:wght@400;500;700&family=Saira+Extra+Condensed:wght@500;700;800&display=swap">
+<style>
+/* Layout: one full-bleed WebGL canvas; menus and HUD float above it as layers.
+   A stage-timing world: asphalt dark, signal yellow, chevron boards, time-card numerals. */
+:root {
+  --asphalt: #101418;
+  --asphalt-2: #1a2027;
+  --panel: rgba(16, 20, 24, 0.84);
+  --line: rgba(232, 236, 240, 0.14);
+  --fg: #eef1f3;
+  --fg-dim: #9aa5ae;
+  --signal: #f5c02a;
+  --signal-ink: #1b1600;
+  --faster: #3fcf7a;
+  --slower: #ff5a4d;
+  --ice: #9fd6ff;
+  --font-display: "Saira Extra Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --font-ko-display: "Black Han Sans", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --font-body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --chevron: repeating-linear-gradient(135deg, var(--signal) 0 10px, var(--asphalt) 10px 20px);
+  --safe-l: max(16px, env(safe-area-inset-left, 0px));
+  --safe-r: max(16px, env(safe-area-inset-right, 0px));
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--asphalt);
+  color: var(--fg);
+  font: 15px/1.5 var(--font-body);
+  overflow: hidden;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+#app { position: fixed; inset: 0; }
+canvas#gl { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+button { font: inherit; color: inherit; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+.layer { position: absolute; inset: 0; }
+[hidden] { display: none !important; }
+
+/* ---------- menu ---------- */
+#menu {
+  overflow-y: auto;
+  background:
+    radial-gradient(120% 80% at 80% -10%, rgba(245, 192, 42, 0.12), transparent 60%),
+    linear-gradient(180deg, #141a20 0%, var(--asphalt) 70%);
+  padding: calc(18px + var(--safe-t)) var(--safe-r) calc(24px + var(--safe-b)) var(--safe-l);
+}
+.menu-inner { max-width: 1180px; margin: 0 auto; display: grid; gap: 22px; }
+.brand { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 24px; }
+.brand h1 {
+  margin: 0;
+  font: 800 clamp(44px, 7vw, 84px)/0.86 var(--font-display);
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+}
+.brand h1 span { color: var(--signal); }
+.brand p { margin: 6px 0 0; color: var(--fg-dim); max-width: 52ch; }
+.brand-tools { display: flex; gap: 8px; flex-wrap: wrap; }
+.chip-btn {
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 999px;
+  padding: 9px 16px;
+  cursor: pointer;
+  font-weight: 500;
+}
+.chip-btn:hover { background: rgba(255, 255, 255, 0.09); }
+.stages { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.stage-card {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto auto 1fr auto;
+  gap: 10px;
+  min-width: 0;
+  padding: 18px 18px 16px;
+  background: var(--asphalt-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.stage-card::before { content: ""; position: absolute; inset: 0 0 auto; height: 6px; background: var(--chevron); opacity: 0.9; }
+.stage-card .rally { display: flex; justify-content: space-between; gap: 8px; color: var(--fg-dim); font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; }
+.stage-card h2 { margin: 0; font: 400 30px/1.1 var(--font-ko-display); text-wrap: balance; }
+.stage-card .sub { color: var(--fg-dim); font-size: 13px; margin-top: 2px; }
+.stage-map { width: 100%; aspect-ratio: 16 / 9; max-width: 100%; border-radius: 4px; background: #0c1014; display: block; }
+.facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.fact { display: grid; gap: 0; }
+.fact b { font: 700 24px/1.1 var(--font-display); font-variant-numeric: tabular-nums; }
+.fact small { color: var(--fg-dim); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; }
+.stage-desc { color: #c5ccd2; font-size: 13.5px; margin: 0; }
+.card-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.best { font: 600 13px/1.3 var(--font-mono); color: var(--fg-dim); font-variant-numeric: tabular-nums; }
+.best em { color: var(--signal); font-style: normal; }
+.go-btn {
+  border: 0;
+  background: var(--signal);
+  color: var(--signal-ink);
+  font: 800 22px/1 var(--font-display);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 12px 22px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.go-btn:active { transform: translateY(1px); }
+.how { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px 24px; color: var(--fg-dim); font-size: 13.5px; }
+.how h3 { margin: 0 0 4px; color: var(--fg); font: 700 15px/1.3 var(--font-body); }
+.how p { margin: 0; }
+.credits { color: #6f7a83; font-size: 11.5px; }
+
+/* ---------- panels (settings / pause / results / loading) ---------- */
+.modal { display: grid; place-items: center; background: rgba(8, 10, 12, 0.62); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); padding: calc(16px + var(--safe-t)) var(--safe-r) calc(16px + var(--safe-b)) var(--safe-l); }
+.sheet {
+  width: min(720px, 100%);
+  max-height: 100%;
+  overflow-y: auto;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 20px 22px;
+  display: grid;
+  gap: 16px;
+}
+.sheet h2 { margin: 0; font: 400 28px/1.15 var(--font-ko-display); }
+.sheet h3 { margin: 0; font: 700 13px/1.3 var(--font-body); letter-spacing: 0.08em; text-transform: uppercase; color: var(--fg-dim); }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.seg button { border: 0; background: transparent; padding: 9px 14px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--signal); color: var(--signal-ink); font-weight: 700; }
+.field { display: grid; grid-template-columns: 9.5em 1fr 4.5em; gap: 10px; align-items: center; }
+.field label { color: var(--fg); font-size: 14px; }
+.field output { font: 600 13px var(--font-mono); text-align: right; color: var(--fg-dim); font-variant-numeric: tabular-nums; }
+input[type="range"] { width: 100%; accent-color: var(--signal); }
+.toggles { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px; }
+.toggle { display: flex; gap: 10px; align-items: center; padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px; cursor: pointer; }
+.toggle input { width: 18px; height: 18px; accent-color: var(--signal); }
+.toggle small { display: block; color: var(--fg-dim); font-size: 12px; }
+.sheet-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+.btn { border: 1px solid var(--line); background: rgba(255, 255, 255, 0.06); padding: 11px 18px; border-radius: 4px; cursor: pointer; font-weight: 700; }
+.btn.primary { background: var(--signal); color: var(--signal-ink); border-color: transparent; }
+.note { color: var(--fg-dim); font-size: 12.5px; margin: 0; }
+
+#loading .sheet { width: min(460px, 100%); text-align: left; }
+.progress { height: 6px; background: rgba(255, 255, 255, 0.1); border-radius: 3px; overflow: hidden; }
+.progress i { display: block; height: 100%; width: 0; background: var(--signal); transition: width 0.25s; }
+.error { color: var(--slower); white-space: pre-wrap; font: 500 13px var(--font-mono); }
+
+/* ---------- HUD ---------- */
+#hud { pointer-events: none; font-variant-numeric: tabular-nums; }
+#hud .tl { position: absolute; top: calc(10px + var(--safe-t)); left: var(--safe-l); display: grid; gap: 2px; }
+.stage-name { font: 600 12px/1.2 var(--font-body); color: var(--fg-dim); letter-spacing: 0.06em; text-transform: uppercase; text-shadow: 0 1px 2px #000; }
+.clock { font: 800 46px/1 var(--font-display); text-shadow: 0 2px 6px rgba(0, 0, 0, 0.6); }
+.clock small { font-size: 0.6em; }
+.splits { display: grid; gap: 2px; font: 600 13px/1.3 var(--font-mono); text-shadow: 0 1px 2px #000; }
+.splits .faster { color: var(--faster); }
+.splits .slower { color: var(--slower); }
+.penalty { color: var(--slower); font: 600 13px var(--font-mono); text-shadow: 0 1px 2px #000; }
+#hud .tr { position: absolute; top: calc(10px + var(--safe-t)); right: var(--safe-r); display: grid; justify-items: end; gap: 8px; pointer-events: auto; }
+.hud-btns { display: flex; gap: 8px; }
+.hud-btn {
+  pointer-events: auto;
+  min-width: 48px; height: 48px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: rgba(10, 13, 16, 0.6);
+  font: 700 14px/1 var(--font-body);
+  padding: 0 12px;
+  cursor: pointer;
+}
+#minimap { width: 150px; height: 150px; border-radius: 8px; background: rgba(10, 13, 16, 0.55); border: 1px solid var(--line); }
+.progressbar { width: 150px; height: 5px; border-radius: 3px; background: rgba(255, 255, 255, 0.15); overflow: hidden; }
+.progressbar i { display: block; height: 100%; background: var(--signal); width: 0; }
+
+.notes { position: absolute; top: calc(10px + var(--safe-t)); left: 50%; transform: translateX(-50%); display: flex; gap: 8px; align-items: flex-start; }
+.pn {
+  display: grid; grid-template-columns: 52px auto; align-items: center; gap: 4px 8px;
+  padding: 6px 12px 6px 8px;
+  background: rgba(250, 248, 240, 0.94);
+  color: #0d1114;
+  border-radius: 6px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  min-width: 120px;
+  transition: opacity 0.2s, transform 0.2s;
+}
+.pn.next { outline: 3px solid var(--signal); }
+.pn.later { opacity: 0.72; transform: scale(0.86); transform-origin: top left; }
+.pn svg { width: 52px; height: 52px; }
+.pn .g { font: 800 38px/0.9 var(--font-display); }
+.pn .m { grid-column: 1 / -1; font: 700 12px/1.2 var(--font-body); color: #3d4650; }
+.pn .d { font: 600 12px/1 var(--font-mono); color: #57626c; }
+.pn.warn { background: #ffe9a8; }
+
+.dash { position: absolute; left: 50%; bottom: calc(14px + var(--safe-b)); transform: translateX(-50%); display: grid; justify-items: center; gap: 4px; }
+.leds { display: flex; gap: 4px; }
+.leds i { width: 16px; height: 8px; border-radius: 2px; background: rgba(255, 255, 255, 0.12); }
+.leds i.on.g { background: #46d36f; } .leds i.on.y { background: #ffcf3a; } .leds i.on.r { background: #ff4a3a; }
+.leds.flash i.on { background: #4aa3ff; }
+.speedo { display: flex; align-items: flex-end; gap: 14px; text-shadow: 0 2px 6px rgba(0, 0, 0, 0.7); }
+.gear { font: 800 64px/0.85 var(--font-display); color: var(--signal); min-width: 0.7em; text-align: center; }
+.kmh { font: 800 54px/0.85 var(--font-display); min-width: 2.6ch; text-align: right; }
+.kmh small { display: block; font: 600 11px/1.4 var(--font-body); color: var(--fg-dim); text-align: right; letter-spacing: 0.1em; }
+.status { display: flex; gap: 8px; align-items: center; font: 600 12px var(--font-body); color: var(--fg-dim); text-shadow: 0 1px 2px #000; }
+.status .warn { color: var(--ice); }
+.tyres { display: grid; grid-template-columns: 9px 9px; gap: 3px 10px; }
+.tyres i { width: 9px; height: 15px; border-radius: 2px; background: #46d36f; }
+
+.banner {
+  position: absolute; left: 50%; top: 38%; transform: translate(-50%, -50%);
+  font: 800 clamp(48px, 10vw, 120px)/1 var(--font-display);
+  text-transform: uppercase; color: var(--fg);
+  text-shadow: 0 4px 20px rgba(0, 0, 0, 0.7);
+  text-align: center;
+}
+.banner small { display: block; font: 600 clamp(14px, 2vw, 20px)/1.3 var(--font-body); text-transform: none; color: var(--fg-dim); }
+.startlights { display: flex; gap: 10px; justify-content: center; margin-bottom: 10px; }
+.startlights i { width: 26px; height: 26px; border-radius: 50%; background: #2a2f35; border: 2px solid #000; }
+.startlights i.red { background: #ff3b30; box-shadow: 0 0 18px #ff3b30; }
+.startlights i.green { background: #34e36a; box-shadow: 0 0 18px #34e36a; }
+.toast {
+  position: absolute; left: 50%; top: 24%; transform: translateX(-50%);
+  background: rgba(10, 13, 16, 0.78); border: 1px solid var(--line);
+  padding: 8px 16px; border-radius: 6px; font: 700 16px var(--font-body);
+}
+.callout { position: absolute; left: 50%; top: calc(96px + var(--safe-t)); transform: translateX(-50%); font: 700 15px var(--font-body); color: var(--fg); text-shadow: 0 1px 3px #000; opacity: 0.85; white-space: nowrap; }
+
+/* ---------- touch controls ---------- */
+#touch { touch-action: none; pointer-events: none; }
+#steerZone, #pedals .pedal, #pedals .tbtn { pointer-events: auto; }
+#steerZone { position: absolute; left: 0; top: calc(90px + var(--safe-t)); bottom: 0; width: 48%; }
+#steerTrack {
+  position: absolute; height: 54px; transform: translate(-50%, -50%);
+  border-radius: 27px; border: 1px dashed rgba(255, 255, 255, 0.35);
+  background: rgba(10, 13, 16, 0.25); pointer-events: none;
+}
+#wheelIcon {
+  position: absolute; left: calc(26px + var(--safe-l)); bottom: calc(24px + var(--safe-b));
+  width: 110px; height: 110px; border-radius: 50%;
+  border: 9px solid rgba(240, 244, 248, 0.55);
+  box-sizing: border-box; pointer-events: none;
+}
+#wheelIcon::before { content: ""; position: absolute; left: 50%; top: 50%; width: 76%; height: 9px; background: rgba(240, 244, 248, 0.55); transform: translate(-50%, -50%); border-radius: 4px; }
+#wheelIcon::after { content: ""; position: absolute; left: 50%; top: -9px; width: 6px; height: 14px; background: var(--signal); transform: translateX(-50%); border-radius: 2px; }
+.steer-hint { position: absolute; left: calc(150px + var(--safe-l)); bottom: calc(60px + var(--safe-b)); color: rgba(255, 255, 255, 0.55); font: 600 13px var(--font-body); pointer-events: none; text-shadow: 0 1px 2px #000; }
+#pedals { position: absolute; right: var(--safe-r); bottom: calc(16px + var(--safe-b)); display: grid; grid-template-columns: auto auto auto; grid-template-rows: auto auto; gap: 12px; align-items: end; }
+.pedal {
+  --v: 0;
+  position: relative;
+  width: 92px; height: min(44vh, 260px);
+  border-radius: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  background: rgba(10, 13, 16, 0.4);
+  overflow: hidden;
+  grid-row: 1 / 3;
+}
+.pedal::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: calc(var(--v) * 100%); background: var(--fill); opacity: 0.55; }
+.pedal span { position: absolute; left: 0; right: 0; bottom: 12px; text-align: center; font: 700 14px var(--font-body); z-index: 1; text-shadow: 0 1px 2px #000; }
+#gasPedal { --fill: #3fcf7a; }
+#brakePedal { --fill: #ff5a4d; width: 84px; }
+.tbtn {
+  width: 84px; height: 72px; border-radius: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  background: rgba(10, 13, 16, 0.4);
+  display: grid; place-items: center; text-align: center;
+  font: 700 13px/1.15 var(--font-body);
+}
+.tbtn.on { background: rgba(245, 192, 42, 0.55); color: #111; }
+#hbBtn { grid-column: 1; grid-row: 2; width: 96px; height: 96px; border-radius: 50%; }
+#gearBox { grid-column: 1; grid-row: 1; display: grid; gap: 8px; }
+#gearBox .tbtn { width: 96px; height: 56px; }
+
+#rotate { display: none; }
+@media (orientation: portrait) and (pointer: coarse) {
+  #rotate:not([data-dismissed]) { display: grid; }
+}
+#rotate { place-items: center; text-align: center; background: rgba(8, 10, 12, 0.9); padding: 24px var(--safe-r) 24px var(--safe-l); }
+#rotate b { font: 400 28px/1.2 var(--font-ko-display); }
+
+@media (max-width: 700px) {
+  .clock { font-size: 36px; }
+  #minimap { width: 110px; height: 110px; }
+  .progressbar { width: 110px; }
+  .pn { min-width: 0; }
+  .pn.later { display: none; }
+  .pedal { width: 76px; }
+  #brakePedal { width: 70px; }
+  #hbBtn { width: 78px; height: 78px; }
+  #gearBox .tbtn { width: 78px; }
+  #wheelIcon { width: 84px; height: 84px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pn, .progress i { transition: none; }
+}
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
+  }
+}
+</script>
+</head>
+<body>
+<div id="app">
+  <canvas id="gl"></canvas>
+
+  <!-- in-stage HUD -->
+  <div id="hud" class="layer" hidden>
+    <div class="tl">
+      <div class="stage-name" id="hudStage"></div>
+      <div class="clock" id="hudClock">0:00.0</div>
+      <div class="splits" id="hudSplits"></div>
+      <div class="penalty" id="hudPenalty"></div>
+    </div>
+    <div class="notes" id="hudNotes"></div>
+    <div class="callout" id="hudCallout"></div>
+    <div class="tr">
+      <div class="hud-btns">
+        <button class="hud-btn" id="btnReset" type="button" title="길 위로 복귀 (+5초)">복귀</button>
+        <button class="hud-btn" id="btnCam" type="button" title="카메라 전환">추격</button>
+        <button class="hud-btn" id="btnPause" type="button" title="일시정지" aria-label="일시정지">❚❚</button>
+      </div>
+      <canvas id="minimap" width="300" height="300"></canvas>
+      <div class="progressbar"><i id="hudProgress"></i></div>
+    </div>
+    <div class="dash">
+      <div class="leds" id="hudLeds"></div>
+      <div class="speedo">
+        <div class="gear" id="hudGear">1</div>
+        <div class="kmh"><span id="hudSpeed">0</span><small>KM/H</small></div>
+      </div>
+      <div class="status">
+        <div class="tyres" id="hudTyres"><i></i><i></i><i></i><i></i></div>
+        <span id="hudSurface">자갈</span>
+        <span id="hudAssist"></span>
+      </div>
+    </div>
+    <div class="banner" id="hudBanner" hidden></div>
+    <div class="toast" id="hudToast" hidden></div>
+  </div>
+
+  <!-- touch controls -->
+  <div id="touch" class="layer" hidden>
+    <div id="steerZone">
+      <div id="steerTrack" hidden></div>
+    </div>
+    <div id="wheelIcon"></div>
+    <div class="steer-hint" id="steerHint">왼쪽 아무 곳이나 누르고 좌우로 밀기</div>
+    <div id="pedals">
+      <div id="gearBox">
+        <div class="tbtn" id="gearUp">▲ 시프트업</div>
+        <div class="tbtn" id="gearDown">▼ 시프트다운</div>
+      </div>
+      <div class="tbtn" id="hbBtn">핸드<br>브레이크</div>
+      <div class="pedal" id="brakePedal"><span>브레이크</span></div>
+      <div class="pedal" id="gasPedal"><span>가속</span></div>
+    </div>
+  </div>
+
+  <!-- stage select -->
+  <div id="menu" class="layer">
+    <div class="menu-inner">
+      <header class="brand">
+        <div>
+          <h1>Special<br><span>Stage</span></h1>
+          <p>실제 WRC 스테이지의 도로와 지형을 그대로 옮긴 랠리 시뮬레이터. 코드라이버의 페이스노트를 듣고, 타이어 그립을 느끼며 한 번에 달려야 한다.</p>
+        </div>
+        <div class="brand-tools">
+          <button class="chip-btn" id="btnSettings" type="button">조작 · 보조 · 그래픽</button>
+          <button class="chip-btn" id="btnFullscreen" type="button">전체 화면</button>
+        </div>
+      </header>
+      <section class="stages" id="stageList" aria-label="스테이지 선택"></section>
+      <section class="how" aria-label="조작 방법">
+        <div><h3>터치 (태블릿 가로)</h3><p>왼쪽 화면을 누른 채 좌우로 밀어 조향. 오른쪽 페달은 누르는 높이만큼 깊게 밟힌다. 핸드브레이크로 헤어핀을 돌아라.</p></div>
+        <div><h3>게임패드 · 키보드</h3><p>블루투스 패드: 왼쪽 스틱 조향, RT 가속, LT 브레이크, A 핸드브레이크, RB/LB 변속. 키보드: 방향키·WASD, Space, E/Q, C 카메라, R 복귀.</p></div>
+        <div><h3>시뮬레이션 물리</h3><p>노면별 타이어 마찰원, 하중 이동, 서스펜션, 터보·안티랙 엔진, 시퀀셜 5단, 센터 직결 4WD와 LSD를 실시간 계산한다.</p></div>
+      </section>
+      <p class="credits">도로·호수·숲·건물: © OpenStreetMap 기여자 (ODbL). 고도: AWS Terrain Tiles (Mapzen, EU-DEM/SRTM). 실제 도로 위치와 고저차를 사용하며, 콜린스 크레스트의 점프 형상만 DEM 해상도 한계로 보강했다.</p>
+    </div>
+  </div>
+
+  <!-- settings -->
+  <div id="settings" class="layer modal" hidden>
+    <div class="sheet" role="dialog" aria-labelledby="setTitle">
+      <h2 id="setTitle">조작 · 보조 · 그래픽</h2>
+      <div class="row"><h3>조향 방식</h3></div>
+      <div class="row">
+        <div class="seg" id="segSteer">
+          <button type="button" data-v="slide">슬라이드</button>
+          <button type="button" data-v="tilt">기울기</button>
+          <button type="button" data-v="buttons">좌/우 버튼</button>
+        </div>
+      </div>
+      <p class="note" id="tiltNote">기울기: 태블릿을 핸들처럼 돌린다. 출발 순간의 자세가 중앙이다.</p>
+      <div class="field"><label for="rngSens">조향 감도</label><input id="rngSens" type="range" min="0.6" max="1.8" step="0.05"><output id="outSens"></output></div>
+      <div class="field"><label for="rngLin">중앙 정밀도</label><input id="rngLin" type="range" min="1" max="2.2" step="0.05"><output id="outLin"></output></div>
+      <h3>드라이빙 보조</h3>
+      <div class="toggles">
+        <label class="toggle"><input type="checkbox" id="optAutoGear"><span>자동 변속<small>끄면 ▲▼ 버튼으로 시퀀셜 변속</small></span></label>
+        <label class="toggle"><input type="checkbox" id="optCounter"><span>카운터스티어 보조<small>미끄러질 때 반대로 조금 돌려준다</small></span></label>
+        <label class="toggle"><input type="checkbox" id="optABS"><span>ABS<small>실제 Rally2 차량엔 없음</small></span></label>
+        <label class="toggle"><input type="checkbox" id="optTCS"><span>트랙션 컨트롤<small>휠스핀 시 출력 제한</small></span></label>
+        <label class="toggle"><input type="checkbox" id="optSpeedSteer"><span>속도 감응 조향<small>고속에서 조향을 둔하게</small></span></label>
+        <label class="toggle"><input type="checkbox" id="optVoice"><span>코드라이버 음성<small>한국어 페이스노트 낭독</small></span></label>
+      </div>
+      <h3>차량 셋업</h3>
+      <div class="field"><label for="rngBias">브레이크 밸런스(앞)</label><input id="rngBias" type="range" min="0.5" max="0.72" step="0.01"><output id="outBias"></output></div>
+      <div class="field"><label for="rngFinal">기어비 (짧게↔길게)</label><input id="rngFinal" type="range" min="-0.4" max="0.4" step="0.05"><output id="outFinal"></output></div>
+      <div class="field"><label for="rngSpring">스프링 강성</label><input id="rngSpring" type="range" min="0.75" max="1.3" step="0.05"><output id="outSpring"></output></div>
+      <div class="field"><label for="rngLsd">리어 LSD 잠김</label><input id="rngLsd" type="range" min="0.2" max="0.7" step="0.05"><output id="outLsd"></output></div>
+      <h3>그래픽 · 소리</h3>
+      <div class="row">
+        <div class="seg" id="segQuality">
+          <button type="button" data-v="low">절전</button>
+          <button type="button" data-v="medium">균형</button>
+          <button type="button" data-v="high">고품질</button>
+        </div>
+      </div>
+      <div class="field"><label for="rngVol">음량</label><input id="rngVol" type="range" min="0" max="1" step="0.05"><output id="outVol"></output></div>
+      <div class="sheet-actions">
+        <button class="btn" type="button" id="btnDefaults">기본값</button>
+        <button class="btn primary" type="button" id="btnCloseSettings">완료</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- loading -->
+  <div id="loading" class="layer modal" hidden>
+    <div class="sheet">
+      <h2 id="loadTitle">스테이지 준비 중</h2>
+      <div class="progress"><i id="loadBar"></i></div>
+      <p class="note" id="loadText">도로 데이터를 불러오는 중</p>
+      <div class="error" id="loadError" hidden></div>
+      <div class="sheet-actions" id="loadActions" hidden><button class="btn" type="button" id="btnLoadBack">메뉴로</button></div>
+    </div>
+  </div>
+
+  <!-- pause -->
+  <div id="pause" class="layer modal" hidden>
+    <div class="sheet" style="width:min(420px,100%)">
+      <h2>일시정지</h2>
+      <p class="note" id="pauseInfo"></p>
+      <div class="sheet-actions" style="justify-content:stretch;display:grid">
+        <button class="btn primary" type="button" id="btnResume">계속 달리기</button>
+        <button class="btn" type="button" id="btnRestart">처음부터 다시</button>
+        <button class="btn" type="button" id="btnPauseSettings">조작 · 보조 · 그래픽</button>
+        <button class="btn" type="button" id="btnQuit">스테이지 선택으로</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- results -->
+  <div id="results" class="layer modal" hidden>
+    <div class="sheet" style="width:min(520px,100%)">
+      <h2 id="resTitle">스테이지 완주</h2>
+      <div id="resBody"></div>
+      <div class="sheet-actions">
+        <button class="btn" type="button" id="btnResMenu">스테이지 선택</button>
+        <button class="btn primary" type="button" id="btnResRetry">다시 달리기</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="rotate" class="layer"><div><b>태블릿을 가로로 돌려 주세요</b><p class="note">가로 화면에서 페달과 핸들이 제자리에 놓입니다.</p><button class="btn" type="button" id="btnRotateDismiss">세로로 계속</button></div></div>
+</div>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
