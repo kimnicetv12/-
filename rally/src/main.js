@@ -9,6 +9,8 @@ import { CarModel } from './render/carModel.js';
 import { Environment } from './render/environment.js';
 import { Particles, emitFromCar } from './render/particles.js';
 import { CameraRig } from './render/cameraRig.js';
+import { PostFX } from './render/post.js';
+import { SHARED } from './render/materials.js';
 import { CarAudio } from './audio/audio.js';
 import { Controls } from './input/controls.js';
 import { Hud } from './ui/hud.js';
@@ -46,6 +48,7 @@ function resize() {
   camera.aspect = w / Math.max(1, h);
   camera.updateProjectionMatrix();
   game?.particles?.setViewport(h * pixelRatio);
+  game?.post?.setSize();
 }
 function applyQuality() {
   pixelRatio = Math.min(window.devicePixelRatio || 1, quality().pixelRatio);
@@ -253,17 +256,10 @@ class Game {
   constructor(prepared, meta) {
     this.meta = meta;
     this.prepared = prepared;
-    this.scene = new THREE.Scene();
-    const q = quality();
-    this.world = new WorldView(prepared, this.scene, q);
-    this.env = new Environment(this.scene, renderer, prepared.stage, q);
-    this.env.skyMat.depthTest = false;
     this.run = new StageRun(prepared, settings, meta);
-    this.carModel = new CarModel(this.run.car, undefined, { headlights: prepared.stage.timeOfDay === 'dusk' });
-    this.scene.add(this.carModel.root);
-    this.particles = new Particles(this.scene);
-    this.particles.setViewport(app.clientHeight * pixelRatio);
     this.rig = new CameraRig(camera, prepared.terrain.ground);
+    this.rig.setMode(settings.camera);
+    this.buildView();
     this.best = loadBest(meta.id);
     this.paused = false;
     this.fpsAvg = 60;
@@ -275,7 +271,48 @@ class Game {
     this.applyLiveSettings();
   }
 
+  /** (Re)build everything visual for the current quality preset. */
+  buildView() {
+    if (this.scene) this.disposeView();
+    const q = (this.q = quality());
+    const prepared = this.prepared;
+    this.scene = new THREE.Scene();
+    this.env = new Environment(this.scene, renderer, prepared.stage, q);
+    this.world = new WorldView(prepared, this.scene, q);
+    this.carModel = new CarModel(this.run.car, undefined, { headlights: prepared.stage.timeOfDay === 'dusk' });
+    this.scene.add(this.carModel.root);
+    this.carModel.setView(this.rig.mode);
+    this.particles = new Particles(this.scene);
+    this.particles.setViewport(app.clientHeight * pixelRatio);
+    const tint = { dusk: [0.95, 0.72, 0.58], day: [1, 0.98, 0.95], winter: [0.92, 0.95, 1] }[this.env.key];
+    this.particles.setLight(...tint);
+    // image-based lighting strength per material
+    this.scene.traverse((o) => {
+      const mats = Array.isArray(o.material) ? o.material : o.material ? [o.material] : [];
+      for (const m of mats) if (m.isMeshStandardMaterial) m.envMapIntensity = this.env.envIntensity * (m.userData.envScale ?? 1);
+    });
+    let lo = Infinity;
+    for (let i = 0; i < prepared.road.n; i += 10) lo = Math.min(lo, prepared.road.y[i]);
+    SHARED.uHazeBase.value = lo;
+    camera.far = Math.max(4600, this.env.fogFar + 900);
+    camera.updateProjectionMatrix();
+    this.post = q.post ? new PostFX(renderer, this.scene, camera, q, this.env.key) : null;
+    renderer.shadowMap.enabled = q.shadows;
+    renderer.shadowMap.needsUpdate = true;
+  }
+
+  disposeView() {
+    this.world.dispose();
+    this.env.dispose();
+    this.carModel.dispose();
+    this.particles.dispose();
+    this.post?.dispose();
+    this.scene.clear();
+    renderer.renderLists.dispose();
+  }
+
   applyLiveSettings() {
+    if (this.q !== quality()) this.buildView();
     const car = this.run.car;
     car.assists.autoGear = settings.autoGear;
     car.assists.abs = settings.abs;
@@ -336,18 +373,25 @@ class Game {
     }
 
     // visuals
-    this.carModel.update();
+    for (const e of car.events) if (e.type === 'pop' || e.type === 'limiter') this.carModel.pop();
+    this.carModel.update(dt);
+    SHARED.uTime.value += dt;
     let rough = 0;
     for (const w of car.wheels) if (w.contact) rough += w.surface.rough * 0.25;
     this.rig.update(car, dt, rough);
-    this.env.update(camera, car.position);
-    this.world.update(camera.position);
+    this.carModel.setView(this.rig.mode);
+    camera.updateMatrixWorld();
+    this.env.update(camera, car.position, dt);
+    this.world.update(camera.position, dt);
     emitFromCar(this.particles, car, dt, quality().particles);
     this.particles.update(dt);
     audio.update(car, dt);
     car.events.length = 0;
     hud.update(dt, run);
-    renderer.render(this.scene, camera);
+    if (this.post) {
+      const blur = this.rig.mode === 'bumper' ? 1.2 : this.rig.attached ? 0.8 : 1;
+      this.post.render(dt, Math.max(0, Math.min(1, (Math.abs(car.speed) - 22) / 30)) * blur);
+    } else renderer.render(this.scene, camera);
     this.adaptResolution(dt);
   }
 
@@ -393,12 +437,7 @@ class Game {
 
   dispose() {
     this.run.codriver.stop();
-    this.world.dispose();
-    this.env.dispose();
-    this.carModel.dispose();
-    this.particles.dispose();
-    this.scene.clear();
-    renderer.renderLists.dispose();
+    this.disposeView();
   }
 }
 
@@ -483,7 +522,13 @@ $('btnResRetry').addEventListener('click', () => {
 });
 $('btnLoadBack').addEventListener('click', toMenu);
 $('btnReset').addEventListener('click', () => game?.run.resetToRoad());
-$('btnCam').addEventListener('click', () => { if (game) $('btnCam').textContent = (game.rig.cycle(), game.rig.label); });
+$('btnCam').addEventListener('click', () => {
+  if (!game) return;
+  settings.camera = game.rig.cycle();
+  saveSettings(settings);
+  game.carModel.setView(game.rig.mode);
+  $('btnCam').textContent = game.rig.label;
+});
 controls.on('reset', () => game?.run.resetToRoad());
 controls.on('camera', () => $('btnCam').click());
 controls.on('pause', () => game && pause(!game.paused));
@@ -505,3 +550,5 @@ buildMenu();
 bindSettings();
 window.__game = () => game; // handy for debugging in the console
 window.__controls = controls;
+window.__renderer = renderer;
+window.__camera = camera;

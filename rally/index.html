@@ -314,7 +314,8 @@ input[type="range"] { width: 100%; accent-color: var(--signal); }
 <script type="importmap">
 {
   "imports": {
-    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
   }
 }
 </script>
@@ -336,7 +337,7 @@ input[type="range"] { width: 100%; accent-color: var(--signal); }
     <div class="tr">
       <div class="hud-btns">
         <button class="hud-btn" id="btnReset" type="button" title="길 위로 복귀 (+5초)">복귀</button>
-        <button class="hud-btn" id="btnCam" type="button" title="카메라 전환">추격</button>
+        <button class="hud-btn" id="btnCam" type="button" title="카메라 전환 (추격 · 원거리 · 콕핏 · 보닛 · 범퍼)">추격</button>
         <button class="hud-btn" id="btnPause" type="button" title="일시정지" aria-label="일시정지">❚❚</button>
       </div>
       <canvas id="minimap" width="300" height="300"></canvas>
@@ -434,6 +435,7 @@ input[type="range"] { width: 100%; accent-color: var(--signal); }
           <button type="button" data-v="low">절전</button>
           <button type="button" data-v="medium">균형</button>
           <button type="button" data-v="high">고품질</button>
+          <button type="button" data-v="ultra">울트라</button>
         </div>
       </div>
       <div class="field"><label for="rngVol">음량</label><input id="rngVol" type="range" min="0" max="1" step="0.05"><output id="outVol"></output></div>

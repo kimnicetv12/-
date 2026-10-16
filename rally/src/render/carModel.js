@@ -1,6 +1,7 @@
 // Procedural Rally2 hatchback model, driven by the physics state.
 import * as THREE from 'three';
 import { liveryTexture } from './textures.js';
+import { Cockpit } from './cockpit.js';
 
 const WIDTH = 1.78;
 
@@ -9,9 +10,9 @@ function bodyShape() {
   // side profile, x forward (+) from the centre of gravity, y up from ground
   s.moveTo(2.0, 0.26);
   s.lineTo(2.07, 0.42);
-  s.lineTo(2.05, 0.62);
-  s.lineTo(1.9, 0.76);
-  s.lineTo(0.95, 0.92);
+  s.lineTo(2.06, 0.64);
+  s.lineTo(1.93, 0.8);
+  s.lineTo(0.98, 0.9);
   s.lineTo(0.14, 1.34);
   s.lineTo(-1.12, 1.38);
   s.lineTo(-1.6, 1.25);
@@ -77,13 +78,16 @@ export class CarModel {
     this.root.add(body);
 
     const livery = liveryTexture(scheme);
-    const paint = new THREE.MeshStandardMaterial({ map: livery, roughness: 0.32, metalness: 0.25 });
-    const glass = new THREE.MeshStandardMaterial({ color: 0x0c1218, roughness: 0.08, metalness: 0.6 });
-    const black = new THREE.MeshStandardMaterial({ color: 0x151515, roughness: 0.7 });
+    // clear-coated paint and glass pick up the sky reflections (scene.environment)
+    const paint = new THREE.MeshPhysicalMaterial({ map: livery, roughness: 0.45, metalness: 0.05, clearcoat: 0.8, clearcoatRoughness: 0.12 });
+    paint.userData.envScale = 0.8;
+    const glass = new THREE.MeshStandardMaterial({ color: 0x0a0f14, roughness: 0.04, metalness: 0 });
+    glass.userData.envScale = 0.75;
+    const black = new THREE.MeshStandardMaterial({ color: 0x131416, roughness: 0.62 });
     this.materials = [paint, glass, black];
     this.textures = [livery];
 
-    const geo = new THREE.ExtrudeGeometry(bodyShape(), { depth: WIDTH - 0.12, bevelEnabled: true, bevelThickness: 0.06, bevelSize: 0.05, bevelSegments: 2, curveSegments: 10 });
+    const geo = new THREE.ExtrudeGeometry(bodyShape(), { depth: WIDTH - 0.12, bevelEnabled: true, bevelThickness: 0.07, bevelSize: 0.05, bevelSegments: 5, curveSegments: 18 });
     // UVs in livery space; mirror the left side so text reads correctly
     const pos = geo.attributes.position, nrm = geo.attributes.normal, uv = geo.attributes.uv;
     geo.computeVertexNormals();
@@ -103,12 +107,19 @@ export class CarModel {
     shapeBody(gl);
     gl.rotateY(Math.PI / 2);
     body.add(new THREE.Mesh(gl, glass));
-    const ws = quad([0.95, 0.92], [0.14, 1.34], WIDTH * 0.8, 0.065);
+    const ws = quad([0.98, 0.9], [0.14, 1.34], WIDTH * 0.8, 0.065);
     ws.material = glass;
     body.add(ws);
     const rg = quad([-1.6, 1.25], [-1.96, 0.98], WIDTH * 0.74, 0.065);
     rg.material = glass;
     body.add(rg);
+    // matte anti-glare panel on the bonnet in front of the windscreen
+    const matte = new THREE.MeshStandardMaterial({ color: 0x101113, roughness: 0.95 });
+    matte.userData.envScale = 0.2;
+    this.materials.push(matte);
+    const ag = quad([1.62, 0.835], [0.98, 0.9], WIDTH * 0.84, 0.072);
+    ag.material = matte;
+    body.add(ag);
 
     // rear wing, roof scoop, mud flaps, arches, lights
     const wing = new THREE.Mesh(new THREE.BoxGeometry(WIDTH * 0.86, 0.035, 0.34), paint);
@@ -139,8 +150,8 @@ export class CarModel {
         }
       }
     }
-    const headMat = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xfff4d6, emissiveIntensity: 1.2 });
-    const tailMat = new THREE.MeshStandardMaterial({ color: 0x550000, emissive: 0xff1a1a, emissiveIntensity: 0.6 });
+    const headMat = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xfff4d6, emissiveIntensity: opts.headlights ? 4 : 1.6 });
+    const tailMat = new THREE.MeshStandardMaterial({ color: 0x550000, emissive: 0xff1a1a, emissiveIntensity: 0.8 });
     this.tailMat = tailMat;
     this.materials.push(headMat, tailMat);
     for (const sx of [-1, 1]) {
@@ -165,9 +176,24 @@ export class CarModel {
     const lp = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.12, 0.02), plateMat);
     lp.position.set(0, 0.56, 2.115);
     body.add(lp);
-    const ex = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.18, 10).rotateX(Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x777777, metalness: 0.8, roughness: 0.3 }));
+    const exMat = new THREE.MeshStandardMaterial({ color: 0x777777, metalness: 0.8, roughness: 0.3 });
+    const ex = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.18, 16).rotateX(Math.PI / 2), exMat);
     ex.position.set(0.48, 0.24, 2.1);
     body.add(ex);
+    // anti-lag flame, flashed on pops
+    const flameMat = new THREE.MeshBasicMaterial({ color: 0xff8a2a, transparent: true, opacity: 0.9, toneMapped: false });
+    flameMat.color.multiplyScalar(4);
+    this.flame = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.45, 10).rotateX(Math.PI / 2).translate(0, 0, 0.22), flameMat);
+    this.flame.position.set(0.48, 0.24, 2.16);
+    this.flame.visible = false;
+    body.add(this.flame);
+    this.flameTimer = 0;
+    this.materials.push(exMat, flameMat);
+    // wiper resting on the scuttle
+    const wiper = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.015, 0.02), black);
+    wiper.position.set(-0.18, 0.955, -0.88);
+    wiper.rotation.y = 0.12;
+    body.add(wiper);
     const fb = new THREE.Mesh(new THREE.BoxGeometry(WIDTH * 0.9, 0.18, 0.08), black);
     fb.position.set(0, 0.3, -2.1);
     body.add(fb);
@@ -178,10 +204,10 @@ export class CarModel {
 
     if (opts.headlights) {
       for (const sx of [-1, 1]) {
-        const spot = new THREE.SpotLight(0xfff2dd, 60, 140, 0.42, 0.5, 1.6);
-        spot.position.set(sx * 0.6, 0.66, -2.1);
+        const spot = new THREE.SpotLight(0xfff2dd, 9, 160, 0.36, 0.65, 1.15);
+        spot.position.set(sx * 0.6, 0.66, -2.2);
         const target = new THREE.Object3D();
-        target.position.set(sx * 1.5, -1.5, -30);
+        target.position.set(sx * 1.2, -0.6, -40);
         body.add(target);
         spot.target = target;
         body.add(spot);
@@ -189,13 +215,24 @@ export class CarModel {
     }
 
     // wheels
-    const tyre = new THREE.MeshStandardMaterial({ color: 0x1b1b1b, roughness: 0.9 });
-    const rim = new THREE.MeshStandardMaterial({ color: scheme.rim || 0xe8e8e8, roughness: 0.35, metalness: 0.6 });
-    this.materials.push(tyre, rim);
+    const tyre = new THREE.MeshStandardMaterial({ color: 0x1a1a1b, roughness: 0.93 });
+    const rim = new THREE.MeshStandardMaterial({ color: scheme.rim || 0xd9dadc, roughness: 0.28, metalness: 0.85 });
+    const disc = new THREE.MeshStandardMaterial({ color: 0x6f7378, roughness: 0.45, metalness: 0.9 });
+    const caliper = new THREE.MeshStandardMaterial({ color: 0xc8102e, roughness: 0.4, metalness: 0.2 });
+    this.materials.push(tyre, rim, disc, caliper);
     const r = vehicle.car.wheelRadius;
-    const tyreGeo = new THREE.CylinderGeometry(r, r, 0.22, 22).rotateZ(Math.PI / 2);
-    const rimGeo = new THREE.CylinderGeometry(r * 0.62, r * 0.62, 0.225, 16).rotateZ(Math.PI / 2);
-    const spokeGeo = new THREE.BoxGeometry(0.23, r * 1.15, 0.05);
+    // tyre with rounded shoulders (lathe profile)
+    const prof = [];
+    for (let k = 0; k <= 12; k++) {
+      const a = (k / 12) * Math.PI;
+      prof.push(new THREE.Vector2(r * 0.7 + (r * 0.3) * Math.sin(a) ** 0.35, -0.11 * Math.cos(a)));
+    }
+    const tyreGeo = new THREE.LatheGeometry(prof, 36).rotateZ(Math.PI / 2);
+    const rimGeo = new THREE.CylinderGeometry(r * 0.66, r * 0.66, 0.2, 28, 1, true).rotateZ(Math.PI / 2);
+    const faceGeo = new THREE.CylinderGeometry(r * 0.2, r * 0.2, 0.21, 16).rotateZ(Math.PI / 2);
+    const spokeGeo = new THREE.BoxGeometry(0.05, r * 1.3, 0.05);
+    const discGeo = new THREE.CylinderGeometry(r * 0.52, r * 0.52, 0.03, 24).rotateZ(Math.PI / 2);
+    const calGeo = new THREE.BoxGeometry(0.06, 0.12, 0.16);
     this.wheels = vehicle.wheels.map((w) => {
       const steer = new THREE.Group();
       const spin = new THREE.Group();
@@ -203,18 +240,37 @@ export class CarModel {
       t.castShadow = true;
       spin.add(t);
       spin.add(new THREE.Mesh(rimGeo, rim));
-      for (let k = 0; k < 5; k++) {
+      spin.add(new THREE.Mesh(faceGeo, rim));
+      const outer = w.mount.x < 0 ? -0.075 : 0.075;
+      for (let k = 0; k < 6; k++) {
         const sp = new THREE.Mesh(spokeGeo, rim);
-        sp.rotation.x = (k / 5) * Math.PI;
+        sp.position.x = outer;
+        sp.rotation.x = (k / 6) * Math.PI;
         spin.add(sp);
       }
+      const dsk = new THREE.Mesh(discGeo, disc);
+      dsk.position.x = -outer * 0.4;
+      steer.add(dsk);
+      const cal = new THREE.Mesh(calGeo, caliper);
+      cal.position.set(-outer * 0.4, r * 0.38, 0.12);
+      steer.add(cal);
       steer.add(spin);
       this.root.add(steer);
       return { steer, spin, w };
     });
+    this.cockpit = new Cockpit(body, vehicle);
   }
 
-  update() {
+  /** Show the interior only for the in-car camera. */
+  setView(mode) {
+    this.cockpit.visible = mode === 'cockpit';
+  }
+
+  pop() {
+    this.flameTimer = 0.07 + Math.random() * 0.05;
+  }
+
+  update(dt = 1 / 60) {
     const v = this.vehicle;
     this.root.position.copy(v.position);
     this.root.quaternion.copy(v.quaternion);
@@ -224,10 +280,18 @@ export class CarModel {
       wh.steer.rotation.y = -w.steer;
       wh.spin.rotation.x = -w.spin;
     }
-    this.tailMat.emissiveIntensity = v.controls.brake > 0.05 ? 2.5 : 0.6;
+    this.tailMat.emissiveIntensity = v.controls.brake > 0.05 ? 4 : 0.8;
+    if (this.flameTimer > 0) {
+      this.flameTimer -= dt;
+      this.flame.visible = true;
+      this.flame.scale.setScalar(0.7 + Math.random() * 0.6);
+    } else this.flame.visible = false;
+    for (const e of v.events) if (e.type === 'shift') this.cockpit.onShift(e.dir);
+    this.cockpit.update(dt);
   }
 
   dispose() {
+    this.cockpit.dispose();
     this.root.traverse((o) => o.geometry?.dispose?.());
     this.materials.forEach((m) => m.dispose());
     this.textures.forEach((t) => t.dispose());

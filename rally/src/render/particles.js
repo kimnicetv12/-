@@ -23,12 +23,13 @@ const vert = /* glsl */ `
 `;
 const frag = /* glsl */ `
   uniform sampler2D uMap;
+  uniform vec3 uLight;
   varying float vAlpha;
   varying vec3 vColor;
   #include <fog_pars_fragment>
   void main() {
     vec4 t = texture2D(uMap, gl_PointCoord);
-    gl_FragColor = vec4(vColor, t.a * vAlpha);
+    gl_FragColor = vec4(vColor * uLight, t.a * vAlpha);
     #include <fog_fragment>
   }
 `;
@@ -55,7 +56,7 @@ export class Particles {
     this.mat = new THREE.ShaderMaterial({
       vertexShader: vert,
       fragmentShader: frag,
-      uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { uMap: { value: null }, uScale: { value: 400 } }]),
+      uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { uMap: { value: null }, uScale: { value: 400 }, uLight: { value: new THREE.Color(1, 1, 1) } }]),
       transparent: true,
       depthWrite: false,
       fog: true,
@@ -64,6 +65,11 @@ export class Particles {
     this.points = new THREE.Points(g, this.mat);
     this.points.frustumCulled = false;
     scene.add(this.points);
+  }
+
+  /** Tint for the scene's light (e.g. warm and dimmer at dusk). */
+  setLight(r, g, b) {
+    this.mat.uniforms.uLight.value.setRGB(r, g, b);
   }
 
   setViewport(height) {

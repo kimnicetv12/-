@@ -2,8 +2,11 @@
 import * as THREE from 'three';
 import { KIND, PolygonSet } from '../world/terrain.js';
 import { rng } from '../world/scenery.js';
-import { roadTexture, groundDetailTexture, stoneTexture, bannerTexture } from './textures.js';
-import { treeGeometries, colored, merge } from './trees.js';
+import { roadTexture, stoneTexture, bannerTexture } from './textures.js';
+import { treeGeometries, treeGeometriesHD, colored, merge } from './trees.js';
+import { terrainTextures, waterNormal } from './proc.js';
+import { terrainMaterial, atmosphere, foliage } from './materials.js';
+import { GroundCover } from './vegetation.js';
 
 const PALETTE = {
   tarmac: {
@@ -58,6 +61,7 @@ export class WorldView {
     this.buildRoad();
     this.buildIce();
     this.buildTrees();
+    this.cover = new GroundCover(prepared, this.group, quality);
     this.buildWalls();
     this.buildPoles();
     this.buildBuildings();
@@ -100,17 +104,21 @@ export class WorldView {
       const v = 0.9 + h * 0.2;
       col[i * 3] = c[0] * v; col[i * 3 + 1] = c[1] * v; col[i * 3 + 2] = c[2] * v;
     }
-    const detail = groundDetailTexture(stage.surface === 'snow' ? 'snow' : 'ground');
-    const mat = new THREE.MeshLambertMaterial({ vertexColors: true, map: detail });
-    this.disposables.push(detail, mat);
+    const tex = terrainTextures(stage.surface);
+    const mat = terrainMaterial(tex, { snow: stage.surface === 'snow' });
+    this.disposables.push(mat, ...Object.values(tex));
 
     // chunk by triangle centroid
-    const CH = 700;
+    // small triangles (near the road) in 700 m chunks for culling; the big
+    // distant DEM triangles in 4 km chunks to keep draw calls low
     const chunks = new Map();
     for (let t = 0; t < idx.length; t += 3) {
       const a = idx[t] * 3, b = idx[t + 1] * 3, c = idx[t + 2] * 3;
       const cx = (pos[a] + pos[b] + pos[c]) / 3, cz = (pos[a + 2] + pos[b + 2] + pos[c + 2]) / 3;
-      const key = Math.floor(cx / CH) * 100003 + Math.floor(cz / CH);
+      const ext = Math.max(Math.abs(pos[a] - pos[b]), Math.abs(pos[a] - pos[c]), Math.abs(pos[a + 2] - pos[b + 2]), Math.abs(pos[a + 2] - pos[c + 2]));
+      const far = ext > 60;
+      const CH = far ? 4000 : 700;
+      const key = (far ? 'f' : 'n') + Math.floor(cx / CH) + ',' + Math.floor(cz / CH);
       let list = chunks.get(key);
       if (!list) chunks.set(key, (list = []));
       list.push(idx[t], idx[t + 1], idx[t + 2]);
@@ -186,15 +194,19 @@ export class WorldView {
   buildRoad() {
     const { road, stage } = this.p;
     const tex = roadTexture(stage.surface);
-    const mat = new THREE.MeshStandardMaterial({
-      map: tex,
-      roughness: stage.surface === 'tarmac' ? 0.82 : stage.surface === 'snow' ? 0.55 : 0.95,
+    const mat = atmosphere(new THREE.MeshStandardMaterial({
+      map: tex.map,
+      normalMap: tex.normalMap,
+      normalScale: new THREE.Vector2(0.8, 0.8),
+      roughnessMap: tex.roughnessMap,
+      roughness: 1,
       metalness: 0,
       polygonOffset: true,
       polygonOffsetFactor: -2,
       polygonOffsetUnits: -2,
-    });
-    this.disposables.push(tex, mat);
+    }), 'road');
+    mat.userData.envScale = stage.surface === 'snow' ? 0.5 : 0.3;
+    this.disposables.push(tex.map, tex.normalMap, tex.roughnessMap, mat);
     const hw = road.halfWidth;
     const step = 250;
     for (let i0 = 0; i0 < road.n - 1; i0 += step) {
@@ -211,7 +223,8 @@ export class WorldView {
   buildIce() {
     const { road, scenery } = this.p;
     if (!scenery.ice.length) return;
-    const mat = new THREE.MeshStandardMaterial({ color: 0xe4eef7, roughness: 0.12, metalness: 0.05, transparent: true, opacity: 0.82, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
+    const mat = atmosphere(new THREE.MeshStandardMaterial({ color: 0xdfe9f3, roughness: 0.06, metalness: 0.0, transparent: true, opacity: 0.8, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }), 'ice');
+    mat.userData.envScale = 1.2;
     this.disposables.push(mat);
     for (const z of scenery.ice) {
       const i0 = Math.floor(z.s0 / road.step), i1 = Math.min(road.n - 1, Math.ceil(z.s1 / road.step));
@@ -226,11 +239,13 @@ export class WorldView {
   // -------------------------------------------------------------------- trees
   buildTrees() {
     const { scenery, road } = this.p;
-    const geos = treeGeometries();
-    const mat = new THREE.MeshLambertMaterial({ vertexColors: true });
-    this.disposables.push(mat, ...Object.values(geos));
+    const low = treeGeometries();
+    const hd = treeGeometriesHD();
+    const mat = foliage(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.88, metalness: 0 }), { sway: 0.012, from: 3, key: 'tree' });
+    mat.userData.envScale = 0.2;
+    this.disposables.push(mat, ...Object.values(low), ...Object.values(hd));
     const density = this.quality.trees;
-    const CH = 400;
+    const CH = 300;
     const buckets = new Map();
     const proj = {};
     let k = 0;
@@ -242,28 +257,40 @@ export class WorldView {
       if (!b) buckets.set(key, (b = {}));
       (b[t.type] ||= []).push(t);
     }
-    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0), col = new THREE.Color();
+    const rand = rng('tree-tint');
     for (const [key, b] of buckets) {
-      const group = new THREE.Group();
+      const near = new THREE.Group();
+      const far = new THREE.Group();
       const center = new THREE.Vector3();
       let cnt = 0;
       for (const [type, list] of Object.entries(b)) {
-        const im = new THREE.InstancedMesh(geos[type], mat, list.length);
+        const imN = new THREE.InstancedMesh(hd[type], mat, list.length);
+        const imF = new THREE.InstancedMesh(low[type], mat, list.length);
         list.forEach((t, j) => {
           q.setFromAxisAngle(up, t.rot);
-          s.setScalar(t.s);
+          s.set(t.s * (0.92 + rand() * 0.16), t.s * (0.9 + rand() * 0.25), t.s * (0.92 + rand() * 0.16));
           p.set(t.x, t.y - 0.3, t.z);
           m4.compose(p, q, s);
-          im.setMatrixAt(j, m4);
+          imN.setMatrixAt(j, m4);
+          imF.setMatrixAt(j, m4);
+          const v = 0.82 + rand() * 0.36;
+          col.setRGB(v * (0.95 + rand() * 0.1), v, v * (0.9 + rand() * 0.15));
+          imN.setColorAt(j, col);
+          imF.setColorAt(j, col);
           center.add(p);
           cnt++;
         });
-        im.castShadow = this.quality.treeShadows;
-        im.frustumCulled = false;
-        group.add(im);
+        imN.castShadow = this.quality.treeShadows;
+        imN.receiveShadow = true;
+        imN.frustumCulled = imF.frustumCulled = false;
+        near.add(imN);
+        far.add(imF);
       }
       center.divideScalar(cnt || 1);
-      this.treeChunks.push({ group, center, s: key * CH });
+      const group = new THREE.Group();
+      group.add(near, far);
+      this.treeChunks.push({ group, near, far, center, s: key * CH });
       this.add(group);
     }
   }
@@ -273,7 +300,8 @@ export class WorldView {
     const { scenery } = this.p;
     if (!scenery.walls.length) return;
     const tex = stoneTexture();
-    const mat = new THREE.MeshLambertMaterial({ map: tex });
+    const mat = atmosphere(new THREE.MeshStandardMaterial({ map: tex, roughness: 0.92 }), 'wall');
+    mat.userData.envScale = 0.3;
     this.disposables.push(tex, mat);
     const P = [], U = [], I = [];
     const H = 0.75, T = 0.45, B = 0.4;
@@ -324,7 +352,7 @@ export class WorldView {
       colored(new THREE.CylinderGeometry(0.036, 0.036, h * 0.2, 5).translate(0, h * 0.9, 0), snow ? 0xffffff : 0x1a1a1a),
     ];
     const geo = merge(parts);
-    const mat = new THREE.MeshLambertMaterial({ vertexColors: true });
+    const mat = atmosphere(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.5 }), 'pole');
     const im = new THREE.InstancedMesh(geo, mat, scenery.poles.length);
     const m4 = new THREE.Matrix4();
     scenery.poles.forEach((p, j) => im.setMatrixAt(j, m4.makeTranslation(p.x, p.y - 0.1, p.z)));
@@ -391,7 +419,8 @@ export class WorldView {
     }
     const g = merge(geos);
     geos.forEach((x) => x.dispose());
-    const mat = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
+    const mat = atmosphere(new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, roughness: 0.85 }), 'house');
+    mat.userData.envScale = 0.35;
     const m = new THREE.Mesh(g, mat);
     m.castShadow = this.quality.shadows;
     m.receiveShadow = true;
@@ -415,16 +444,16 @@ export class WorldView {
       geos.push(g.index ? g.toNonIndexed() : g);
       if (g.index) g.dispose();
     }
-    for (const g of geos) {
-      const n = g.attributes.position.count;
-      g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(n * 3).fill(1), 3));
-    }
-    const g = merge(geos);
+    const g = merge(geos, ['position', 'normal', 'uv']);
     geos.forEach((x) => x.dispose());
     const frozen = stage.surface === 'snow';
-    const mat = frozen
-      ? new THREE.MeshLambertMaterial({ color: 0xe8f0f8 })
-      : new THREE.MeshPhongMaterial({ color: 0x2c4a58, specular: 0x9ab0c0, shininess: 90, transparent: true, opacity: 0.94 });
+    this.waterNormal = waterNormal();
+    this.waterNormal.repeat.set(1 / 9, 1 / 9);
+    this.disposables.push(this.waterNormal);
+    const mat = atmosphere(frozen
+      ? new THREE.MeshStandardMaterial({ color: 0xe6eef7, roughness: 0.28, metalness: 0, normalMap: this.waterNormal, normalScale: new THREE.Vector2(0.15, 0.15) })
+      : new THREE.MeshStandardMaterial({ color: 0x1b3440, roughness: 0.04, metalness: 0, normalMap: this.waterNormal, normalScale: new THREE.Vector2(0.35, 0.35), transparent: true, opacity: 0.95 }), 'water');
+    mat.userData.envScale = 1.3;
     const m = new THREE.Mesh(g, mat);
     m.receiveShadow = true;
     this.add(m);
@@ -437,9 +466,9 @@ export class WorldView {
     const smp = road.sample(s, {});
     const hw = road.halfWidth + 1.2;
     const grp = new THREE.Group();
-    const postMat = new THREE.MeshLambertMaterial({ color: 0x222222 });
+    const postMat = atmosphere(new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.6, metalness: 0.4 }), 'post');
     const tex = bannerTexture(text, sub, color);
-    const banMat = new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide });
+    const banMat = atmosphere(new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide }), 'banner');
     this.disposables.push(postMat, tex, banMat);
     const rx = -smp.tz, rz = smp.tx;
     const y = surface.profile(smp.y, 0);
@@ -489,7 +518,8 @@ export class WorldView {
       colored(new THREE.SphereGeometry(0.13, 6, 4).translate(0, 1.65, 0), 0xe0b090),
       colored(new THREE.CylinderGeometry(0.09, 0.09, 0.45, 5).translate(0, 0.22, 0), 0x223044),
     ]);
-    const mat = new THREE.MeshLambertMaterial({ vertexColors: true });
+    const mat = atmosphere(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8 }), 'crowd');
+    mat.userData.envScale = 0.3;
     const im = new THREE.InstancedMesh(body, mat, people.length);
     const jackets = [0xd62828, 0xf77f00, 0x1d3557, 0x2a9d8f, 0xe9c46a, 0x6a4c93, 0x111111, 0xfafafa];
     const m4 = new THREE.Matrix4(), col = new THREE.Color();
@@ -504,12 +534,25 @@ export class WorldView {
   }
 
   /** Per-frame: only draw tree chunks near the camera. */
-  update(camPos) {
+  /** Per-frame: tree LOD / culling, ground cover, water ripples. */
+  update(camPos, dt = 0) {
     const r2 = this.quality.treeDistance ** 2;
-    for (const c of this.treeChunks) c.group.visible = c.center.distanceToSquared(camPos) < r2;
+    const d2n = this.quality.treeDetail ** 2;
+    for (const c of this.treeChunks) {
+      const d2 = c.center.distanceToSquared(camPos);
+      c.group.visible = d2 < r2;
+      c.near.visible = d2 < d2n;
+      c.far.visible = !c.near.visible;
+    }
+    this.cover.update(camPos);
+    if (this.waterNormal) {
+      this.waterNormal.offset.x += dt * 0.012;
+      this.waterNormal.offset.y += dt * 0.007;
+    }
   }
 
   dispose() {
+    this.cover.dispose();
     this.scene.remove(this.group);
     this.group.traverse((o) => {
       if (o.isInstancedMesh) o.dispose();

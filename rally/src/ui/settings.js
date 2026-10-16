@@ -23,6 +23,7 @@ export const DEFAULTS = {
   rearLsd: 0.4,
   quality: null,
   volume: 0.8,
+  camera: 'chase',
 };
 
 export function loadSettings() {
@@ -46,9 +47,22 @@ export function saveSettings(s) {
 }
 
 export const QUALITY = {
-  low: { pixelRatio: 1, shadows: false, treeShadows: false, shadowMap: 512, trees: 0.5, treeDistance: 600, fogScale: 0.75, particles: 0.5 },
-  medium: { pixelRatio: 1.5, shadows: true, treeShadows: false, shadowMap: 1024, trees: 0.8, treeDistance: 900, fogScale: 0.9, particles: 0.8 },
-  high: { pixelRatio: 2, shadows: true, treeShadows: true, shadowMap: 2048, trees: 1, treeDistance: 1300, fogScale: 1, particles: 1 },
+  low: {
+    pixelRatio: 1, shadows: false, treeShadows: false, shadowMap: 512, shadowRange: 45, trees: 0.5, treeDistance: 600, treeDetail: 0,
+    fogScale: 0.75, particles: 0.5, grass: 0, grassDistance: 0, blobShadows: false, post: false, bloom: false, aa: null, lensFlare: false,
+  },
+  medium: {
+    pixelRatio: 1.25, shadows: true, treeShadows: false, shadowMap: 1024, shadowRange: 42, trees: 0.8, treeDistance: 900, treeDetail: 130,
+    fogScale: 0.9, particles: 0.8, grass: 0.55, grassDistance: 110, blobShadows: true, post: true, bloom: true, aa: 'fxaa', lensFlare: false,
+  },
+  high: {
+    pixelRatio: 1.6, shadows: true, treeShadows: true, shadowMap: 2048, shadowRange: 48, trees: 1, treeDistance: 1300, treeDetail: 230,
+    fogScale: 1, particles: 1, grass: 0.9, grassDistance: 170, blobShadows: true, post: true, bloom: true, aa: 'smaa', lensFlare: true,
+  },
+  ultra: {
+    pixelRatio: 2, shadows: true, treeShadows: true, shadowMap: 4096, shadowRange: 60, trees: 1, treeDistance: 1900, treeDetail: 400,
+    fogScale: 1.15, particles: 1, grass: 1.35, grassDistance: 250, blobShadows: true, post: true, bloom: true, aa: 'smaa', lensFlare: true,
+  },
 };
 
 export function loadBest(id) {

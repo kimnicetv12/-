@@ -1,6 +1,7 @@
 // Procedural canvas textures (no image assets needed).
 import * as THREE from 'three';
 import { rng } from '../world/scenery.js';
+import { heightFromCanvas, normalFromHeight } from './proc.js';
 
 function canvas(w, h) {
   const c = document.createElement('canvas');
@@ -120,7 +121,27 @@ export function roadTexture(surface) {
       ctx.restore();
     }
   }
-  return finish(c);
+  const map = finish(c);
+  const normalMap = normalFromHeight(heightFromCanvas(c, surface === 'snow' ? 2 : 1), surface === 'gravel' ? 7 : surface === 'snow' ? 3 : 5);
+  // roughness: rubbered racing lines on tarmac, polished icy ruts on snow
+  const r = canvas(64, 256);
+  const rg = r.getContext('2d');
+  const base = surface === 'tarmac' ? 208 : surface === 'snow' ? 196 : 242;
+  rg.fillStyle = `rgb(${base},${base},${base})`;
+  rg.fillRect(0, 0, 64, 256);
+  const lines = surface === 'tarmac' ? [[0.3, 0.05, 150], [0.38, 0.05, 150], [0.62, 0.05, 150], [0.7, 0.05, 150]] : surface === 'snow' ? [[0.28, 0.1, 80], [0.72, 0.1, 80]] : [[0.28, 0.12, 220], [0.72, 0.12, 220]];
+  for (const [u, w, v] of lines) {
+    const grd = rg.createLinearGradient((u - w) * 64, 0, (u + w) * 64, 0);
+    grd.addColorStop(0, `rgba(${v},${v},${v},0)`);
+    grd.addColorStop(0.5, `rgba(${v},${v},${v},1)`);
+    grd.addColorStop(1, `rgba(${v},${v},${v},0)`);
+    rg.fillStyle = grd;
+    rg.fillRect((u - w) * 64, 0, w * 128, 256);
+  }
+  const roughnessMap = new THREE.CanvasTexture(r);
+  roughnessMap.wrapS = roughnessMap.wrapT = THREE.RepeatWrapping;
+  roughnessMap.colorSpace = THREE.NoColorSpace;
+  return { map, normalMap, roughnessMap };
 }
 
 /** Tileable ground detail (greyscale, multiplied with vertex colours). */
