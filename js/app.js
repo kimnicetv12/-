@@ -963,6 +963,7 @@
       : '예시 답변 116개로 기본기를 익혔어요. 연습할수록 더 배워요.';
   }
 
+  $('#app-version').textContent = `v${window.MALANG_VERSION || 'dev'}`;
   FlyBrain.init();
   initSetup();
   bind();

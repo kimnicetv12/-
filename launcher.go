@@ -1,9 +1,10 @@
 // 말랑 면접 실행기 (Windows용 exe)
 //
-// 화면 파일을 exe 안에 담아 두고, 내 컴퓨터 안에서만 접속되는 작은 웹 서버를 띄운 뒤
+// 화면 파일과 글꼴을 exe 안에 담아 두고, 내 컴퓨터 안에서만 접속되는 작은 웹 서버를 띄운 뒤
 // 크롬(없으면 엣지)을 앱 창으로 연다. 창을 닫으면 잠시 후 실행기도 스스로 꺼진다.
+// 배포용 빌드는 검은 콘솔 창 없이 돌고, 문제가 생기면 알림 창으로 알린다(launcher_windows.go).
 //
-// 빌드: GOOS=windows GOARCH=amd64 go build -ldflags "-s -w" -o dist/말랑면접.exe .
+// 빌드: ./build-exe.sh  →  dist/말랑면접.exe
 package main
 
 import (
@@ -16,12 +17,16 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 )
 
-//go:embed index.html style.css js/*.js
+//go:embed index.html style.css js/*.js fonts
 var webFiles embed.FS
+
+// 빌드할 때 -ldflags "-X main.version=..." 으로 넣는다
+var version = "dev"
 
 // 포트를 고정해야 브라우저가 마이크 권한·연습 기록·저장한 키를 기억한다.
 const port = 47615
@@ -41,11 +46,11 @@ func main() {
 	if err != nil {
 		// 이미 실행 중이면 창만 하나 더 연다
 		if alreadyRunning(addr) {
-			fmt.Println("말랑 면접이 이미 실행 중이에요. 창을 하나 더 열게요.")
+			say("말랑 면접이 이미 실행 중이에요. 창을 하나 더 열게요.")
 			openBrowser(url)
 			return
 		}
-		fail(fmt.Sprintf("포트 %d을(를) 다른 프로그램이 쓰고 있어요: %v", port, err))
+		fail(fmt.Sprintf("다른 프로그램이 %d번 포트를 쓰고 있어서 시작할 수 없어요.\n그 프로그램을 끄거나 컴퓨터를 다시 켠 뒤 실행해 주세요.\n\n(%v)", port, err))
 	}
 
 	sub, _ := fs.Sub(webFiles, ".")
@@ -56,7 +61,10 @@ func main() {
 		mu.Unlock()
 		w.Write([]byte("ok"))
 	})
-	mux.Handle("/", noCache(http.FileServer(http.FS(sub))))
+	mux.HandleFunc("/__malang/version", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(version))
+	})
+	mux.Handle("/", cacheRules(http.FileServer(http.FS(sub))))
 
 	go func() {
 		if err := http.Serve(ln, mux); err != nil {
@@ -64,14 +72,7 @@ func main() {
 		}
 	}()
 
-	fmt.Println("========================================")
-	fmt.Println("  말랑 면접이 실행됐어요!")
-	fmt.Println("  잠시 후 면접 창이 열립니다.")
-	fmt.Println("  창이 안 열리면 크롬 주소창에 아래 주소를 넣으세요:")
-	fmt.Printf("  http://%s\n", addr)
-	fmt.Println()
-	fmt.Println("  면접 창을 닫으면 이 검은 창도 저절로 꺼져요.")
-	fmt.Println("========================================")
+	say(fmt.Sprintf("말랑 면접 %s 실행 중 · 창이 안 열리면 크롬 주소창에 http://%s 를 넣으세요. 면접 창을 닫으면 저절로 꺼져요.", version, addr))
 
 	openBrowser(url)
 	waitUntilClosed()
@@ -107,9 +108,14 @@ func alreadyRunning(addr string) bool {
 	return res.StatusCode == http.StatusOK
 }
 
-func noCache(h http.Handler) http.Handler {
+// 화면 파일은 새 버전이 바로 반영되게 매번 새로 읽고, 글꼴은 바뀌지 않으니 하루 동안 재사용한다
+func cacheRules(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Cache-Control", "no-store")
+		if strings.HasPrefix(r.URL.Path, "/fonts/") {
+			w.Header().Set("Cache-Control", "max-age=86400")
+		} else {
+			w.Header().Set("Cache-Control", "no-store")
+		}
 		h.ServeHTTP(w, r)
 	})
 }
@@ -148,11 +154,4 @@ func browserCandidates() []string {
 		}
 	}
 	return out
-}
-
-func fail(msg string) {
-	fmt.Println("문제가 생겼어요:", msg)
-	fmt.Println("엔터 키를 누르면 창이 닫혀요.")
-	fmt.Scanln()
-	os.Exit(1)
 }

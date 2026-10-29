@@ -37,8 +37,8 @@
   --mochi-powder: #eedfd2;
 
   --shadow: 0 14px 30px -18px rgba(140, 80, 60, 0.45), 0 2px 6px -2px rgba(140, 80, 60, 0.12);
-  --display: "Jua", "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
-  --hand: "Gaegu", "Jua", "Pretendard", sans-serif;
+  --display: "Jua", "Pretendard Variable", "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --hand: "Gaegu", "Jua", "Pretendard Variable", "Pretendard", sans-serif;
   --spring: cubic-bezier(.34, 1.56, .64, 1);
 }
 @media (prefers-color-scheme: dark) {
@@ -106,7 +106,7 @@ body {
   background-image: radial-gradient(var(--dot) 1.4px, transparent 1.6px);
   background-size: 24px 24px;
   color: var(--ink);
-  font-family: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", system-ui, sans-serif;
+  font-family: "Pretendard Variable", "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", system-ui, sans-serif;
   font-size: 16px;
   line-height: 1.6;
   word-break: keep-all;
@@ -336,6 +336,8 @@ details.more[open] summary h2 { margin-bottom: 14px; }
 .history { list-style: none; margin: 0; padding: 0; }
 .history li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 2px dotted var(--line); }
 .history .score { font-family: var(--display); font-size: 1.15rem; color: var(--berry-ink); }
+
+.app-version { text-align: center; color: var(--muted); font-size: 0.8rem; margin: 4px 0 0; }
 
 /* 하단 고정 바 */
 .footer-bar, .lesson-foot {
