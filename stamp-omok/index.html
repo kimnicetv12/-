@@ -479,7 +479,6 @@ const CONFIG = {
   OVERLAP_ENDS_TURN: true,     // 겹쳐서 못 찍었을 때도 차례 소모
   FAIL_PENALTY: 'none',        // 자 확인 실패 패널티: 'none' | 'skip'(한 차례 쉼) | 'cooldown'(자 확인 금지)
   COOLDOWN_TURNS: 2,           // 'cooldown'일 때 자 확인을 못 하는 내 차례 수
-  SHOW_LAST_ANCHOR: true,      // 직전 차례의 내 팔 기준점을 흐리게 표시
   SHOW_LANDING_PREVIEW: false, // 착지점 미리보기 (쉬운 모드)
   STAMP_FLASH_MS: 1100,        // 찍은 직후 내 도장이 보였다 사라지는 시간 (ms)
   // ── 화면 ──────────────────────────────────────
@@ -754,7 +753,7 @@ function judgeRuler(ruler, stamps, owner, cfg) {
   /* ---------------- 설정 저장 (브라우저 저장소, 실패해도 동작) ---------------- */
   const SETTINGS_KEY = 'stamp-omok/settings/v1';
   const EDITABLE_KEYS = ['LINE_TOLERANCE', 'ANGLE_TOLERANCE_DEG', 'ARM_MAX_LENGTH', 'ARM_JITTER', 'FAIL_PENALTY',
-    'OVERLAP_ENDS_TURN', 'SHOW_LAST_ANCHOR', 'SHOW_LANDING_PREVIEW', 'SOUND', 'VIBRATION'];
+    'OVERLAP_ENDS_TURN', 'SHOW_LANDING_PREVIEW', 'SOUND', 'VIBRATION'];
   function loadSettings() {
     try {
       const raw = localStorage.getItem(SETTINGS_KEY);
@@ -1065,7 +1064,7 @@ function judgeRuler(ruler, stamps, owner, cfg) {
   const rulerForJudge = (r) => ({ x: r.x, y: r.y, angle: rulerAngle(r) });
 
   function makePlayer(id) {
-    return { id, armLength: CONFIG.ARM_DEFAULT_LENGTH, dir: id === 0 ? 'right' : 'left', lastAnchor: null,
+    return { id, armLength: CONFIG.ARM_DEFAULT_LENGTH, dir: id === 0 ? 'right' : 'left',
       cam: null, ownTurns: 0, rulerBlockedUntil: 0, skip: 0 };
   }
   function newGame() {
@@ -1152,7 +1151,6 @@ function judgeRuler(ruler, stamps, owner, cfg) {
     const arm = computeArm(state.anchor, P.armLength, P.dir, CONFIG);
     const target = applyJitter(arm.hand, CONFIG, Math.random);
     const blocker = findOverlap(target, state.stamps, CONFIG);
-    P.lastAnchor = { x: state.anchor.x, y: state.anchor.y };
     state.phase = 'animating';
     state.anim = {
       t0: performance.now(), arm, target, owner: P.id, blocked: !!blocker, impact: false, stamp: null,
@@ -1356,24 +1354,9 @@ function judgeRuler(ruler, stamps, owner, cfg) {
     ctx.restore();
   }
 
-  /** 도장 찍기 단계의 최소 안내: 내 팔 기준점(+ 설정 시 지난 기준점·착지점 미리보기) */
+  /** 도장 찍기 단계의 최소 안내: 이번 차례 내 팔 기준점(+ 설정 시 착지점 미리보기). 지난 차례 기준점은 남기지 않음 */
   function drawGuides() {
     const P = cur(), me = PLAYERS[P.id], px = 1 / cam.zoom;
-    if (CONFIG.SHOW_LAST_ANCHOR && P.lastAnchor) {
-      const q = P.lastAnchor;
-      ctx.save();
-      ctx.setLineDash([4 * px, 4 * px]);
-      ctx.strokeStyle = rgba(me.ink, 0.55);
-      ctx.lineWidth = 1.5 * px;
-      circlePath(q.x, q.y, 10 * px); ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.fillStyle = rgba(me.ink, 0.55);
-      circlePath(q.x, q.y, 2 * px); ctx.fill();
-      ctx.font = `${11 * px}px ${token('--font-body')}`;
-      ctx.textAlign = 'center';
-      ctx.fillText('지난 기준점', q.x, q.y + 24 * px);
-      ctx.restore();
-    }
     const A = state.anchor;
     if (!A) return;
     if (CONFIG.SHOW_LANDING_PREVIEW) {
@@ -1991,7 +1974,6 @@ function judgeRuler(ruler, stamps, owner, cfg) {
     { key: 'ARM_JITTER', label: '손떨림', type: 'range', min: 0, max: 0.2, step: 0.01, fmt: (v) => (v ? `도장 지름의 ${Math.round(v * 100)}%` : '없음') },
     { key: 'FAIL_PENALTY', label: '자 확인에 실패하면', type: 'select', options: [['none', '차례만 넘어감'], ['skip', '다음 차례 한 번 쉼'], ['cooldown', `${CONFIG_DEFAULTS.COOLDOWN_TURNS}차례 동안 자 확인 금지`]] },
     { key: 'OVERLAP_ENDS_TURN', label: '도장이 막혀도 차례 소모', type: 'check' },
-    { key: 'SHOW_LAST_ANCHOR', label: '지난 기준점 보여주기', type: 'check' },
     { key: 'SHOW_LANDING_PREVIEW', label: '착지점 미리보기 (쉬운 모드)', type: 'check' },
     { key: 'SOUND', label: '효과음', type: 'check' },
     { key: 'VIBRATION', label: '진동', type: 'check' },
