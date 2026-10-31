@@ -1,0 +1,15 @@
+Binaries/
+Intermediate/
+Saved/
+DerivedDataCache/
+.vs/
+.vscode/
+.idea/
+*.sln
+*.suo
+*.VC.db
+*.opensdf
+*.sdf
+Tests/RulesTest/rules_test
+Tests/RulesTest/rules_test.exe
+__pycache__/
