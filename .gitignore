@@ -3,3 +3,6 @@
 *.rbxlx.lock
 *.rbxl
 sourcemap.json
+
+# court skill trial runs
+.court/
