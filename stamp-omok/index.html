@@ -1,0 +1,2051 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>도장오목</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="theme-color" content="#2e5a50">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Gowun+Dodum&display=swap">
+<style>
+/* 레이아웃: 위 상태 막대 · 가운데 한지 판(캔버스, 화면 가득) · 아래 청자빛 조작판 — 세로 한 화면 앱.
+   한지·인주·청자 인주함이라는 한 가지 세계로 고정한 단일 테마(다크 모드 없음)입니다. */
+:root {
+  --paper: #ebe6d8;          /* 한지 */
+  --paper-deep: #cfc7b2;     /* 한지 그늘·테두리 */
+  --paper-ink: #2b2620;      /* 종이 위 먹 글씨 */
+  --paper-ink-soft: #6a6052;
+  --glaze: #2e5a50;          /* 청자 유약: 조작판 */
+  --glaze-deep: #1e3d36;
+  --glaze-soft: #44776a;
+  --celadon: #a9c6b7;        /* 옅은 청자: 자(아크릴) */
+  --ivory: #f4f0e6;          /* 조작판 위 글씨 */
+  --ivory-dim: #bfd2c8;
+  --brass: #d2ad5b;          /* 놋쇠: 강조·포커스·허용 띠 */
+  --shu: #c8341f;            /* 주홍 인주 (선수 1) */
+  --shu-sleeve: #6e2618;
+  --ai: #2b4b8c;             /* 쪽빛 (선수 2) */
+  --ai-sleeve: #1b2a4d;
+  --alert: #e2553b;
+  --alert-text: #ffbfae;
+  --hairline: rgba(255, 255, 255, 0.18);
+  --shadow: rgba(14, 28, 24, 0.35);
+  --scrim: rgba(16, 32, 28, 0.74);
+  --font-display: "Gowun Batang", "Nanum Myeongjo", "Noto Serif KR", "AppleMyungjo", "Batang", serif;
+  --font-body: "Gowun Dodum", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif;
+  --font-seal: "Noto Serif CJK KR", "Noto Serif KR", "Source Han Serif K", "AppleMyungjo", "Batang", serif;
+  --player-ink: var(--shu);
+  --player-sleeve: var(--shu-sleeve);
+  --grain: none;
+  color-scheme: light;
+}
+body[data-player="ai"] { --player-ink: var(--ai); --player-sleeve: var(--ai-sleeve); }
+
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html {
+  height: 100%;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  background: var(--glaze);
+}
+body {
+  height: 100%; margin: 0; overflow: hidden; overscroll-behavior: none;
+  background: var(--glaze); color: var(--ivory);
+  font: 15px/1.45 var(--font-body);
+  word-break: keep-all; overflow-wrap: break-word;   /* 한국어는 어절 단위로 줄바꿈 */
+  -webkit-user-select: none; user-select: none;
+  -webkit-tap-highlight-color: transparent; -webkit-text-size-adjust: 100%;
+}
+button, input, select { font: inherit; color: inherit; }
+button { touch-action: manipulation; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
+h1, h2 { text-wrap: balance; }
+
+#app { height: 100%; display: flex; flex-direction: column; }
+
+/* ── 위 상태 막대 ── */
+#topbar {
+  flex: none; display: flex; align-items: center; gap: 10px;
+  padding-block: 8px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  background: var(--glaze); border-bottom: 1px solid var(--glaze-deep);
+}
+.who { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; }
+.who img { width: 36px; height: 36px; flex: none; padding: 2px; border-radius: 50%; background: var(--paper); }
+.who strong { font-family: var(--font-display); font-size: 20px; font-weight: 700; letter-spacing: .02em; }
+.who span { color: var(--ivory-dim); margin-left: 4px; font-size: 13px; }
+.meta { font-variant-numeric: tabular-nums; color: var(--ivory-dim); font-size: 13px; white-space: nowrap; }
+.meta b { color: var(--ivory); font-weight: 700; }
+.icon-btn {
+  flex: none; width: 40px; height: 40px; border-radius: 10px;
+  border: 1px solid var(--glaze-soft); background: transparent; color: var(--ivory);
+  display: grid; place-items: center; padding: 0;
+}
+.icon-btn svg { width: 20px; height: 20px; }
+
+/* ── 한지 판 ── */
+#stage { position: relative; flex: 1; min-height: 0; background: var(--paper); overflow: hidden; }
+#board { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+.pill {
+  position: absolute; top: 10px; left: max(12px, env(safe-area-inset-left, 0px));
+  padding: 5px 11px; border-radius: 999px; font-size: 12px; letter-spacing: .02em;
+  background: var(--glaze-deep); color: var(--ivory); opacity: .9; pointer-events: none;
+}
+.pill.open { background: var(--brass); color: var(--glaze-deep); font-weight: 700; }
+#toast {
+  position: absolute; left: 50%; top: 46px; transform: translateX(-50%);
+  width: max-content; max-width: calc(100% - 32px);
+  padding: 9px 14px; border-radius: 10px; text-align: center;
+  background: var(--glaze-deep); color: var(--ivory); font-size: 14px;
+  box-shadow: 0 6px 18px var(--shadow); pointer-events: none;
+}
+#toast.warn { background: var(--shu-sleeve); }
+#banner {
+  position: absolute; left: 50%; top: 46px; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 12px; width: max-content; max-width: calc(100% - 32px);
+  padding: 10px 18px 10px 12px; border-radius: 14px;
+  background: var(--ivory); color: var(--paper-ink); box-shadow: 0 8px 24px var(--shadow);
+  pointer-events: none;
+}
+#banner img { width: 48px; height: 48px; flex: none; }
+#banner strong { display: block; font-family: var(--font-display); font-size: 24px; line-height: 1.1; }
+#banner span { font-size: 13px; color: var(--paper-ink-soft); }
+
+/* ── 아래 조작판 ── */
+#controls {
+  flex: none; display: grid; gap: 10px;
+  padding-block: 10px 12px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  background: var(--glaze); border-top: 1px solid var(--glaze-deep);
+}
+.tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; background: var(--glaze-deep); border-radius: 12px; }
+.tabs button {
+  min-height: 42px; border: 0; border-radius: 9px; background: transparent;
+  color: var(--ivory-dim); font-weight: 700; line-height: 1.15;
+}
+.tabs button[aria-selected="true"] { background: var(--glaze-soft); color: var(--ivory); box-shadow: inset 0 -2px 0 var(--brass); }
+.tabs button:disabled { cursor: default; }
+.tabs button:disabled:not([aria-selected="true"]) { opacity: .45; }
+.tabs small { display: block; font-size: 11px; font-weight: 400; color: var(--ivory-dim); }
+.pane { display: grid; gap: 8px; min-width: 0; }
+.field { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; min-width: 0; }
+.field label { font-weight: 700; }
+.field output { font-family: var(--font-display); font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; min-width: 2.4ch; }
+.unit { color: var(--ivory-dim); font-size: 12px; }
+.detail { margin-left: auto; color: var(--ivory-dim); font-size: 13px; font-variant-numeric: tabular-nums; }
+.slider-row { display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; gap: 8px; align-items: center; }
+.step {
+  height: 40px; border-radius: 10px; border: 1px solid var(--glaze-soft);
+  background: var(--glaze-deep); font-size: 20px; line-height: 1; padding: 0;
+}
+.step:disabled { opacity: .4; }
+.action-row { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 10px; }
+.seg { display: grid; grid-template-columns: 1fr 1fr; border-radius: 12px; overflow: hidden; border: 1px solid var(--glaze-soft); }
+.seg button { min-height: 50px; border: 0; background: var(--glaze-deep); color: var(--ivory-dim); padding: 0 4px; }
+.seg button[aria-pressed="true"] { background: var(--ivory); color: var(--glaze-deep); font-weight: 700; }
+.seg button:disabled { opacity: .6; }
+.btn {
+  min-height: 50px; border-radius: 12px; border: 1px solid transparent; padding: 0 16px;
+  font-weight: 700; font-size: 17px; letter-spacing: .02em;
+}
+.btn.primary { background: var(--player-ink); color: var(--ivory); box-shadow: inset 0 0 0 1px var(--hairline), 0 3px 0 var(--player-sleeve); }
+.btn.primary:active:not(:disabled) { transform: translateY(2px); box-shadow: inset 0 0 0 1px var(--hairline), 0 1px 0 var(--player-sleeve); }
+.btn.ghost { background: transparent; border-color: var(--glaze-soft); color: var(--ivory); }
+.btn:disabled { opacity: .45; cursor: default; }
+.hint { margin: 0; font-size: 12.5px; color: var(--ivory-dim); min-height: 1.45em; }
+.result-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.result-head strong { font-family: var(--font-display); font-size: 21px; color: var(--alert-text); }
+.result-head span { font-size: 13px; color: var(--ivory-dim); }
+.result-msg { margin: 0; font-size: 14px; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+input[type="range"] { -webkit-appearance: none; appearance: none; width: 100%; height: 40px; margin: 0; background: transparent; }
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 6px; border-radius: 3px;
+  background: linear-gradient(to right, var(--brass) var(--fill, 50%), var(--glaze-deep) var(--fill, 50%));
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 26px; height: 26px; margin-top: -10px; border-radius: 50%;
+  background: var(--ivory); border: 3px solid var(--brass); box-shadow: 0 2px 6px var(--shadow);
+}
+input[type="range"]::-moz-range-track { height: 6px; border-radius: 3px; background: var(--glaze-deep); }
+input[type="range"]::-moz-range-progress { height: 6px; border-radius: 3px; background: var(--brass); }
+input[type="range"]::-moz-range-thumb { width: 20px; height: 20px; border-radius: 50%; background: var(--ivory); border: 3px solid var(--brass); }
+
+@media (max-height: 640px) {
+  #controls { gap: 7px; padding-block: 7px 8px; }
+  .hint { display: none; }
+  .btn, .seg button { min-height: 44px; }
+}
+
+/* ── 겹쳐 뜨는 화면들 ── */
+.overlay {
+  position: fixed; inset: 0; z-index: 40; overflow-y: auto;
+  display: flex; align-items: center; justify-content: center;
+  padding-block: max(20px, env(safe-area-inset-top, 0px)) max(20px, env(safe-area-inset-bottom, 0px));
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.overlay.tall { align-items: flex-start; }
+.paper-sheet { background: var(--paper) var(--grain); color: var(--paper-ink); }
+.glaze-sheet { background: var(--glaze); color: var(--ivory); }
+.scrim { background: var(--scrim); z-index: 60; }
+#handoff { z-index: 45; background: var(--glaze-deep); }
+#pause { z-index: 50; }
+#howto, #settings { z-index: 55; }
+#dialog { z-index: 70; }
+
+/* 메인 메뉴: 왼쪽 정렬, 오른쪽 위로 큰 주홍 도장이 잘려 들어옴 */
+#menu { z-index: 42; align-items: stretch; overflow: hidden; }
+.menu-inner { position: relative; width: min(100%, 440px); display: flex; flex-direction: column; justify-content: flex-end; gap: 18px; padding-block: 24px 8px; }
+.menu-seal { position: absolute; top: -10px; right: -92px; width: 300px; transform: rotate(-9deg); mix-blend-mode: multiply; opacity: .92; pointer-events: none; }
+.menu-seal.small { top: 168px; right: 34px; width: 92px; transform: rotate(13deg); opacity: .88; }
+.menu-title { margin: 0; font-family: var(--font-display); font-weight: 700; font-size: clamp(64px, 21vw, 96px); line-height: .98; letter-spacing: .02em; }
+.menu-title span { display: block; }
+.tagline { margin: 0; max-width: 21em; font-size: 17px; color: var(--paper-ink); text-wrap: pretty; }
+.spec { margin: 0; padding-top: 10px; border-top: 1px solid var(--paper-deep); font-size: 12.5px; color: var(--paper-ink-soft); font-variant-numeric: tabular-nums; letter-spacing: .01em; }
+.menu-actions { display: grid; gap: 10px; }
+.menu-actions .btn.primary { background: var(--shu); box-shadow: inset 0 0 0 1px var(--hairline), 0 3px 0 var(--shu-sleeve); }
+.paper-sheet .btn.ghost, .card .btn.ghost { color: var(--paper-ink); border-color: var(--paper-deep); background: transparent; }
+.fine { margin: 0; font-size: 12px; color: var(--paper-ink-soft); }
+
+/* 턴 교체 가림막 */
+.handoff-card { width: min(100%, 360px); display: grid; gap: 14px; justify-items: center; text-align: center; }
+.handoff-card img { width: 132px; height: 132px; padding: 12px; border-radius: 50%; background: var(--paper) var(--grain); box-shadow: 0 10px 30px var(--shadow); }
+.eyebrow { margin: 0; font-size: 12px; letter-spacing: .14em; color: var(--brass); font-variant-numeric: tabular-nums; }
+.handoff-card h2 { margin: 0; font-family: var(--font-display); font-size: 28px; line-height: 1.25; }
+.handoff-card p { margin: 0; color: var(--ivory-dim); }
+.handoff-card .last { font-size: 13px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--glaze-soft); }
+.handoff-card .btn { width: 100%; margin-top: 8px; }
+#handoff.p-shu .btn.primary { background: var(--shu); box-shadow: inset 0 0 0 1px var(--hairline), 0 3px 0 var(--shu-sleeve); }
+#handoff.p-ai .btn.primary { background: var(--ai); box-shadow: inset 0 0 0 1px var(--hairline), 0 3px 0 var(--ai-sleeve); }
+
+/* 카드형 대화상자 */
+.card {
+  width: min(100%, 380px); display: grid; gap: 14px; padding: 22px 20px 20px;
+  border-radius: 16px; background: var(--paper) var(--grain); color: var(--paper-ink);
+  box-shadow: 0 20px 50px var(--shadow);
+}
+.card h2 { margin: 0; font-family: var(--font-display); font-size: 22px; }
+.dlg-body { display: grid; gap: 8px; color: var(--paper-ink); }
+.dlg-body p { margin: 0; }
+.dlg-body .warn { color: var(--shu); font-weight: 700; }
+.stack { display: grid; gap: 10px; }
+
+/* 게임 방법·설정 패널 */
+.panel { width: min(100%, 520px); display: grid; gap: 16px; padding-bottom: 8px; }
+.panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.panel-head h2 { margin: 0; font-family: var(--font-display); font-size: 28px; }
+.paper-sheet .icon-btn { color: var(--paper-ink); border-color: var(--paper-deep); }
+.lede { margin: 0; font-size: 16px; max-width: 34em; }
+.rules { margin: 0; padding: 0; list-style: none; counter-reset: rule; display: grid; gap: 12px; }
+.rules li { counter-increment: rule; display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 2px 10px; }
+.rules li::before {
+  content: counter(rule); grid-row: span 2; width: 26px; height: 26px; border-radius: 50%;
+  display: grid; place-items: center; font-size: 13px; font-weight: 700;
+  background: var(--shu); color: var(--ivory);
+}
+.rules b { font-family: var(--font-display); font-size: 17px; }
+.rules span { color: var(--paper-ink); }
+.tip { margin: 0; padding: 12px 14px; border-radius: 12px; border: 1px dashed var(--paper-deep); color: var(--paper-ink-soft); font-size: 14px; }
+.set-list { display: grid; gap: 4px; }
+.set-row { display: grid; gap: 4px; padding: 10px 0; border-bottom: 1px solid var(--glaze-soft); }
+.set-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.set-head label { font-weight: 700; }
+.set-head output { color: var(--brass); font-variant-numeric: tabular-nums; font-size: 14px; text-align: right; }
+.set-note { margin: 0; font-size: 12.5px; color: var(--ivory-dim); }
+.set-check { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 40px; }
+.set-check input { width: 24px; height: 24px; accent-color: var(--brass); flex: none; }
+.set-row select {
+  min-height: 44px; border-radius: 10px; border: 1px solid var(--glaze-soft);
+  background: var(--glaze-deep); color: var(--ivory); padding: 0 10px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn.primary:active:not(:disabled) { transform: none; }
+}
+</style>
+</head>
+<body data-player="shu">
+
+<div id="app">
+  <header id="topbar">
+    <div class="who">
+      <img id="whoSeal" alt="">
+      <div><strong id="whoName">주홍</strong><span>차례</span></div>
+    </div>
+    <div class="meta"><span id="moveNo">1수</span> · 내 도장 <b id="myCount">0</b></div>
+    <button id="btnCenter" class="icon-btn" type="button" aria-label="판 가운데로 이동">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="6.5"/><path d="M12 2.5v4M12 17.5v4M2.5 12h4M17.5 12h4"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></svg>
+    </button>
+    <button id="btnPause" class="icon-btn" type="button" aria-label="메뉴 열기">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+    </button>
+  </header>
+
+  <main id="stage">
+    <canvas id="board" aria-label="칸 없는 오목판"></canvas>
+    <div id="modePill" class="pill">판 가림</div>
+    <div id="banner" hidden>
+      <img id="bannerSeal" alt="">
+      <div><strong id="bannerTitle">승리</strong><span id="bannerSub"></span></div>
+    </div>
+    <div id="toast" role="status" aria-live="polite" hidden></div>
+  </main>
+
+  <footer id="controls">
+    <div id="tabs" class="tabs" role="tablist" aria-label="이번 차례 행동">
+      <button id="tabStamp" type="button" role="tab" aria-selected="true">도장 찍기</button>
+      <button id="tabRuler" type="button" role="tab" aria-selected="false">자 확인<small id="rulerNote" hidden></small></button>
+    </div>
+
+    <div id="paneStamp" class="pane">
+      <div class="field">
+        <label for="armRange">팔 길이</label>
+        <output id="armValue" for="armRange">3.0</output><span class="unit">도장 지름</span>
+        <span id="armDetail" class="detail"></span>
+      </div>
+      <div class="slider-row">
+        <button id="armMinus" class="step" type="button" aria-label="팔 길이 줄이기">−</button>
+        <input id="armRange" type="range" min="0.5" max="12" step="0.1" value="3">
+        <button id="armPlus" class="step" type="button" aria-label="팔 길이 늘이기">+</button>
+      </div>
+      <div class="action-row">
+        <div class="seg" role="group" aria-label="팔꿈치가 꺾이는 방향">
+          <button id="dirLeft" type="button" aria-pressed="false">◀ 왼쪽</button>
+          <button id="dirRight" type="button" aria-pressed="true">오른쪽 ▶</button>
+        </div>
+        <button id="btnPlace" class="btn primary" type="button" disabled>놓기</button>
+      </div>
+      <p id="hint" class="hint"></p>
+    </div>
+
+    <div id="paneRuler" class="pane" hidden>
+      <div class="field">
+        <label for="angleRange">자 기울기</label>
+        <output id="angleValue" for="angleRange">0°</output>
+        <span id="rulerInfo" class="detail"></span>
+      </div>
+      <div class="slider-row">
+        <button id="angleMinus" class="step" type="button" aria-label="자 기울기 줄이기">−</button>
+        <input id="angleRange" type="range" min="0" max="179.5" step="0.5" value="0">
+        <button id="anglePlus" class="step" type="button" aria-label="자 기울기 늘리기">+</button>
+      </div>
+      <div class="action-row">
+        <button id="btnFit" class="btn ghost" type="button">판 전체 보기</button>
+        <button id="btnJudge" class="btn primary" type="button">판정하기</button>
+      </div>
+      <p class="hint">자 몸통을 끌어 옮기고, 양 끝 손잡이를 돌려 맞추세요.</p>
+    </div>
+
+    <div id="paneResult" class="pane" hidden>
+      <div class="result-head"><strong>판정 실패</strong><span id="resultPenalty"></span></div>
+      <p id="resultMsg" class="result-msg"></p>
+      <button id="btnPass" class="btn primary" type="button">차례 넘기기</button>
+    </div>
+
+    <div id="paneOver" class="pane" hidden>
+      <p id="overMsg" class="result-msg"></p>
+      <div class="two">
+        <button id="btnAgain" class="btn primary" type="button">한 판 더</button>
+        <button id="btnToMenu" class="btn ghost" type="button">메인 메뉴</button>
+      </div>
+    </div>
+  </footer>
+</div>
+
+<!-- 메인 메뉴 -->
+<section id="menu" class="overlay paper-sheet">
+  <div class="menu-inner">
+    <img id="menuSealA" class="menu-seal" alt="">
+    <img id="menuSealB" class="menu-seal small" alt="">
+    <h1 class="menu-title"><span>도장</span><span>오목</span></h1>
+    <p class="tagline">칸 없는 한지 위에 몰래 찍고, 자를 대어 다섯 줄을 입증하세요.</p>
+    <p id="menuSpec" class="spec"></p>
+    <div class="menu-actions">
+      <button id="btnResume" class="btn ghost" type="button" hidden>이어하기</button>
+      <button id="btnNew" class="btn primary" type="button">두 사람 대국 시작</button>
+      <div class="two">
+        <button id="btnHowto" class="btn ghost" type="button">게임 방법</button>
+        <button id="btnSettings" class="btn ghost" type="button">설정</button>
+      </div>
+    </div>
+    <p class="fine">한 기기를 번갈아 쥐는 로컬 2인 대전 · 세로 화면</p>
+  </div>
+</section>
+
+<!-- 턴 교체 가림막 -->
+<section id="handoff" class="overlay" hidden>
+  <div class="handoff-card">
+    <img id="handoffSeal" alt="">
+    <p id="handoffEyebrow" class="eyebrow"></p>
+    <h2 id="handoffTitle"></h2>
+    <p id="handoffBody"></p>
+    <p id="handoffLast" class="last" hidden></p>
+    <button id="btnReady" class="btn primary" type="button">준비됐어요</button>
+  </div>
+</section>
+
+<!-- 일시 정지 -->
+<section id="pause" class="overlay scrim" hidden>
+  <div class="card">
+    <h2>잠시 멈춤</h2>
+    <div class="stack">
+      <button id="btnResumeGame" class="btn primary" type="button">계속하기</button>
+      <button id="btnPauseHowto" class="btn ghost" type="button">게임 방법</button>
+      <button id="btnPauseSettings" class="btn ghost" type="button">설정</button>
+      <button id="btnPauseNew" class="btn ghost" type="button">새 대국</button>
+      <button id="btnPauseMenu" class="btn ghost" type="button">메인 메뉴</button>
+    </div>
+  </div>
+</section>
+
+<!-- 게임 방법 -->
+<section id="howto" class="overlay paper-sheet tall" hidden>
+  <article class="panel">
+    <header class="panel-head">
+      <h2>게임 방법</h2>
+      <button id="btnHowtoClose" class="icon-btn" type="button" aria-label="닫기">✕</button>
+    </header>
+    <div id="howtoBody" class="panel"></div>
+    <button id="btnHowtoDone" class="btn primary" type="button">알겠어요</button>
+  </article>
+</section>
+
+<!-- 설정 -->
+<section id="settings" class="overlay glaze-sheet tall" hidden>
+  <div class="panel">
+    <header class="panel-head">
+      <h2>설정</h2>
+      <button id="btnSettingsClose" class="icon-btn" type="button" aria-label="닫기">✕</button>
+    </header>
+    <div id="settingsList" class="set-list"></div>
+    <div class="two">
+      <button id="btnSettingsReset" class="btn ghost" type="button">기본값으로</button>
+      <button id="btnSettingsDone" class="btn primary" type="button">완료</button>
+    </div>
+  </div>
+</section>
+
+<!-- 확인 대화상자 -->
+<section id="dialog" class="overlay scrim" hidden role="dialog" aria-modal="true" aria-labelledby="dlgTitle">
+  <div class="card">
+    <h2 id="dlgTitle"></h2>
+    <div id="dlgBody" class="dlg-body"></div>
+    <div class="two">
+      <button id="dlgCancel" class="btn ghost" type="button">그만두기</button>
+      <button id="dlgOk" class="btn primary" type="button">확인</button>
+    </div>
+  </div>
+</section>
+
+<noscript><p style="padding:16px">이 게임은 자바스크립트가 필요합니다.</p></noscript>
+
+<!-- =====================================================================
+     1) 설정 + 핵심 로직 (DOM에 의존하지 않는 순수 함수 → Node 단위 테스트 대상)
+     ===================================================================== -->
+<script id="core-logic">
+'use strict';
+
+/* ---------------------------------------------------------------------
+ * CONFIG — 게임 설정값 모음
+ * 길이 값은 따로 적지 않으면 '도장 지름(D)'의 배수입니다.
+ * --------------------------------------------------------------------- */
+const CONFIG = {
+  // ── 판·도장 크기 ───────────────────────────────
+  STONE_DIAMETER: 40,          // 기준 바둑돌 지름 (월드 좌표 단위 = 줌 1배에서 CSS px)
+  STAMP_RATIO: 0.75,           // 도장 지름 = 바둑돌 지름 × 3/4  →  D = 30
+  // ── 승리 판정(자) ──────────────────────────────
+  WIN_COUNT: 5,                // 한 줄로 입증할 도장 수
+  LINE_TOLERANCE: 0.35,        // 허용 오차: 도장 중심 ↔ 직선 최대 거리 (D 배수)
+  ANGLE_TOLERANCE_DEG: 10,     // 최소제곱 피팅 직선과 자의 각도 차 허용 (도)
+  MAX_GAP: 2.0,                // 줄 안 이웃 도장 중심 사이 최대 간격 (D 배수, 0 = 검사 안 함)
+  BLOCK_BY_OPPONENT: true,     // 다섯 도장 사이 직선 위를 상대 도장이 막으면 무효
+  RULER_LENGTH: 9,             // 자 길이 (D 배수)
+  RULER_WIDTH: 1.3,            // 자 폭 (D 배수, 그리기·잡기용)
+  // ── 가상의 팔 ──────────────────────────────────
+  ARM_MIN_LENGTH: 0.5,         // 팔 최소 길이 (D)
+  ARM_MAX_LENGTH: 12,          // 팔 최대 길이 (D)
+  ARM_DEFAULT_LENGTH: 3,       // 첫 차례 팔 길이 (D)
+  ARM_STEP: 0.1,               // 슬라이더·± 버튼 한 칸 (D)
+  ARM_SPLIT: 0.5,              // 위팔(앞으로 뻗는 구간) 비율, 나머지는 꺾인 아래팔
+  ARM_JITTER: 0.06,            // 손떨림 표준편차 (D, 0 = 계산값에 정확히 찍힘)
+  // ── 규칙 옵션 ──────────────────────────────────
+  OVERLAP_ENDS_TURN: true,     // 겹쳐서 못 찍었을 때도 차례 소모
+  FAIL_PENALTY: 'none',        // 자 확인 실패 패널티: 'none' | 'skip'(한 차례 쉼) | 'cooldown'(자 확인 금지)
+  COOLDOWN_TURNS: 2,           // 'cooldown'일 때 자 확인을 못 하는 내 차례 수
+  SHOW_LANDING_PREVIEW: false, // 착지점 미리보기 (쉬운 모드)
+  STAMP_FLASH_MS: 1100,        // 찍은 직후 내 도장이 보였다 사라지는 시간 (ms)
+  // ── 화면 ──────────────────────────────────────
+  VIEW_WIDTH_D: 13,            // 시작 화면 너비에 들어오는 도장 수
+  ZOOM_MIN: 0.3,
+  ZOOM_MAX: 4,
+  // ── 피드백 ────────────────────────────────────
+  SOUND: true,
+  VIBRATION: true,
+};
+const CONFIG_DEFAULTS = Object.freeze({ ...CONFIG });
+
+/** 앞쪽 방향: 화면 위쪽(월드 좌표는 y가 아래로 증가하므로 -y) */
+const FORWARD = Object.freeze({ x: 0, y: -1 });
+
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+
+/** 도장 지름(월드 단위) = 바둑돌 지름 × 3/4 */
+function stampDiameter(cfg) {
+  return cfg.STONE_DIAMETER * cfg.STAMP_RATIO;
+}
+
+/* ---------------------------------------------------------------------
+ * 좌표 계산: 가상의 L자 팔
+ *   start ──(위팔: L×SPLIT, 앞으로)──▶ elbow ──(아래팔: L×(1−SPLIT), 직각으로 좌/우)──▶ hand
+ *   hand = start + forward·L·SPLIT + side·L·(1−SPLIT)
+ * --------------------------------------------------------------------- */
+function computeArm(start, lengthD, dir, cfg, forward = FORWARD) {
+  const D = stampDiameter(cfg);
+  const L = clamp(lengthD, cfg.ARM_MIN_LENGTH, cfg.ARM_MAX_LENGTH) * D;
+  const upper = L * cfg.ARM_SPLIT;
+  const fore = L - upper;
+  // 화면 좌표계(y 아래)에서 앞 방향을 시계방향 90° 돌리면 오른쪽: (x, y) → (−y, x)
+  const s = dir === 'left' ? -1 : 1;
+  const side = { x: -forward.y * s, y: forward.x * s };
+  const elbow = { x: start.x + forward.x * upper, y: start.y + forward.y * upper };
+  const hand = { x: elbow.x + side.x * fore, y: elbow.y + side.y * fore };
+  return { start: { x: start.x, y: start.y }, elbow, hand, upper, fore, length: L };
+}
+
+/** 손떨림: 착지점에 2차원 가우시안 오차를 더함 (Box–Muller, 3σ에서 자름) */
+function applyJitter(p, cfg, rng = Math.random) {
+  const sigma = cfg.ARM_JITTER * stampDiameter(cfg);
+  if (!(sigma > 0)) return { x: p.x, y: p.y };
+  const u1 = Math.max(rng(), 1e-12);
+  const u2 = rng();
+  const r = Math.min(Math.sqrt(-2 * Math.log(u1)), 3) * sigma;
+  return { x: p.x + r * Math.cos(2 * Math.PI * u2), y: p.y + r * Math.sin(2 * Math.PI * u2) };
+}
+
+/* ---------------------------------------------------------------------
+ * 충돌 검사: 지름 D인 두 원은 중심 거리 < D 이면 겹침 (딱 맞닿는 건 허용)
+ * 겹치는 첫 도장을 반환, 없으면 null
+ * --------------------------------------------------------------------- */
+function findOverlap(p, stamps, cfg) {
+  const D = stampDiameter(cfg);
+  for (const s of stamps) {
+    if (Math.hypot(s.x - p.x, s.y - p.y) < D - 1e-9) return s;
+  }
+  return null;
+}
+
+/** 점 p를 (기준점 o, 방향각 angle) 직선에 투영: t = 직선 방향 성분, d = 부호 있는 수직 거리 */
+function projectOnLine(p, o, angle) {
+  const ux = Math.cos(angle), uy = Math.sin(angle);
+  const dx = p.x - o.x, dy = p.y - o.y;
+  return { t: dx * ux + dy * uy, d: -dx * uy + dy * ux };
+}
+
+/** 방향이 없는 두 직선의 각도 차 (0 ~ π/2) */
+function lineAngleDiff(a, b) {
+  const d = Math.abs(a - b) % Math.PI;
+  return Math.min(d, Math.PI - d);
+}
+
+/* ---------------------------------------------------------------------
+ * 최소제곱 직선 피팅 (직교 최소제곱 = 주성분 방향)
+ * y = ax + b 회귀는 세로줄에서 기울기가 발산하므로, 각 점에서 직선까지의
+ * '수직 거리' 제곱합을 최소화하는 직선을 구한다.
+ *   중심 (mx, my), 방향 θ = ½·atan2(2·Sxy, Sxx − Syy)
+ * --------------------------------------------------------------------- */
+function fitLineLeastSquares(points) {
+  const n = points.length;
+  let mx = 0, my = 0;
+  for (const p of points) { mx += p.x; my += p.y; }
+  mx /= n; my /= n;
+  let sxx = 0, syy = 0, sxy = 0;
+  for (const p of points) {
+    const dx = p.x - mx, dy = p.y - my;
+    sxx += dx * dx; syy += dy * dy; sxy += dx * dy;
+  }
+  const angle = 0.5 * Math.atan2(2 * sxy, sxx - syy);
+  const ux = Math.cos(angle), uy = Math.sin(angle);
+  const residuals = points.map((p) => Math.abs(-(p.x - mx) * uy + (p.y - my) * ux));
+  let maxResidual = 0, worst = 0, ss = 0;
+  residuals.forEach((r, i) => { ss += r * r; if (r > maxResidual) { maxResidual = r; worst = i; } });
+  return { cx: mx, cy: my, angle, ux, uy, residuals, maxResidual, worst, rms: Math.sqrt(ss / n) };
+}
+
+/** n개 중 k개를 고르는 모든 조합에 대해 fn(인덱스 배열) 호출. fn이 true를 돌려주면 중단 */
+function forEachCombination(n, k, fn) {
+  if (k > n || k <= 0) return false;
+  const idx = Array.from({ length: k }, (_, i) => i);
+  for (;;) {
+    if (fn(idx)) return true;
+    let i = k - 1;
+    while (i >= 0 && idx[i] === n - k + i) i--;
+    if (i < 0) return false;
+    idx[i]++;
+    for (let j = i + 1; j < k; j++) idx[j] = idx[j - 1] + 1;
+  }
+}
+
+/** 자의 허용 띠 안(수직 거리 ≤ 허용 오차, 자 길이 안)에 중심이 들어온 내 도장들 */
+function rulerCandidates(ruler, stamps, owner, cfg) {
+  const D = stampDiameter(cfg);
+  const tol = cfg.LINE_TOLERANCE * D;
+  const half = (cfg.RULER_LENGTH * D) / 2;
+  const out = [];
+  for (const s of stamps) {
+    if (s.owner !== owner) continue;
+    const r = projectOnLine(s, ruler, ruler.angle);
+    if (Math.abs(r.d) <= tol && Math.abs(r.t) <= half) out.push({ s, t: r.t, d: r.d });
+  }
+  return out;
+}
+
+const pct = (v) => `${Math.round(v * 100)}%`;
+const RAD2DEG = 180 / Math.PI;
+
+/**
+ * 다섯 점 한 묶음 평가 (단계가 높을수록 승리에 가까움)
+ *  ① 직선성: 최소제곱 피팅 직선에서 모든 중심이 허용 오차 이내
+ *  ② 자 정렬: 피팅 직선과 자의 각도 차 ≤ 허용 각, 피팅 중심 ↔ 자 직선 거리 ≤ 허용 오차
+ *  ③ 간격: 줄을 따라 이웃한 두 도장 중심 사이 ≤ MAX_GAP
+ *  ④ 가로막기: 첫 도장과 끝 도장 사이 직선 위에 상대 도장 몸통이 없어야 함
+ */
+function evaluateLine(points, ruler, stamps, owner, cfg) {
+  const D = stampDiameter(cfg);
+  const tol = cfg.LINE_TOLERANCE * D;
+  const fit = fitLineLeastSquares(points);
+  const base = { success: false, fit, chosen: points };
+  const center = { x: fit.cx, y: fit.cy };
+
+  if (fit.maxResidual > tol + 1e-9) {
+    return { ...base, stage: 1, score: fit.maxResidual, code: 'NOT_STRAIGHT',
+      message: `다섯 도장이 한 줄에서 벗어났어요. 가장 먼 도장이 도장 지름의 ${pct(fit.maxResidual / D)}만큼 비켜 있어요 (허용 ${pct(cfg.LINE_TOLERANCE)}).` };
+  }
+
+  const angleDiff = lineAngleDiff(fit.angle, ruler.angle);
+  const offset = Math.abs(projectOnLine(center, ruler, ruler.angle).d);
+  if (angleDiff * RAD2DEG > cfg.ANGLE_TOLERANCE_DEG + 1e-9 || offset > tol + 1e-9) {
+    return { ...base, stage: 2, score: angleDiff, code: 'MISALIGNED', angleDiff, offset,
+      message: `자가 도장 줄과 어긋났어요. 각도 차 ${(angleDiff * RAD2DEG).toFixed(1)}° (허용 ${cfg.ANGLE_TOLERANCE_DEG}°).` };
+  }
+
+  const order = points
+    .map((p) => ({ p, t: projectOnLine(p, center, fit.angle).t }))
+    .sort((a, b) => a.t - b.t);
+  let maxGap = 0, gapAt = -1;
+  for (let i = 1; i < order.length; i++) {
+    const g = Math.hypot(order[i].p.x - order[i - 1].p.x, order[i].p.y - order[i - 1].p.y);
+    if (g > maxGap) { maxGap = g; gapAt = i; }
+  }
+  const ordered = order.map((o) => o.p);
+  if (cfg.MAX_GAP > 0 && maxGap > cfg.MAX_GAP * D + 1e-9) {
+    return { ...base, ordered, stage: 3, score: maxGap, code: 'GAP', gapAt, maxGap,
+      message: `줄 사이가 너무 벌어졌어요. 가장 넓은 간격이 도장 ${(maxGap / D).toFixed(1)}개 (허용 ${cfg.MAX_GAP}개).` };
+  }
+
+  if (cfg.BLOCK_BY_OPPONENT) {
+    const tMin = order[0].t, tMax = order[order.length - 1].t;
+    for (const s of stamps) {
+      if (s.owner === owner) continue;
+      const r = projectOnLine(s, center, fit.angle);
+      if (r.t > tMin && r.t < tMax && Math.abs(r.d) < D / 2) {
+        return { ...base, ordered, stage: 4, score: -Math.abs(r.d), code: 'BLOCKED', blocker: s,
+          message: '상대 도장이 다섯 도장 사이를 가로막고 있어요.' };
+      }
+    }
+  }
+
+  return { ...base, ordered, stage: 5, score: 0, success: true, code: 'WIN',
+    message: `다섯 도장이 한 줄! 최대 오차 도장 지름의 ${pct(fit.maxResidual / D)}.` };
+}
+
+/**
+ * 자 판정 (승리 선언 검증)
+ * ruler: { x, y, angle(라디안) }  — 자 중심과 방향
+ * 1) 자의 허용 띠 안에 중심이 들어온 내 도장을 모은다
+ * 2) 그중 다섯 개 조합마다 evaluateLine — 하나라도 통과하면 승리
+ * 3) 모두 실패하면 가장 승리에 가까웠던 조합의 이유를 돌려준다
+ */
+function judgeRuler(ruler, stamps, owner, cfg) {
+  const need = cfg.WIN_COUNT;
+  const cands = rulerCandidates(ruler, stamps, owner, cfg);
+  const base = { success: false, candidates: cands.map((c) => c.s) };
+  if (cands.length < need) {
+    return { ...base, stage: 0, code: 'NOT_ENOUGH',
+      message: `자의 허용 띠 안에 든 내 도장이 ${cands.length}개예요. ${need}개가 필요해요.` };
+  }
+  // 자에 가까운 순으로 최대 12개만 조합 탐색 (12C5 = 792가지)
+  const pool = cands
+    .slice()
+    .sort((a, b) => Math.abs(a.d) - Math.abs(b.d))
+    .slice(0, 12)
+    .sort((a, b) => a.t - b.t);
+  let best = null;
+  forEachCombination(pool.length, need, (idx) => {
+    const ev = evaluateLine(idx.map((i) => pool[i].s), ruler, stamps, owner, cfg);
+    if (!best || ev.stage > best.stage || (ev.stage === best.stage && ev.score < best.score)) best = ev;
+    return ev.success;
+  });
+  return { ...base, ...best };
+}
+</script>
+
+<!-- =====================================================================
+     2) 화면 · 입력 · 연출
+     ===================================================================== -->
+<script>
+'use strict';
+(() => {
+  const TAU = Math.PI * 2;
+  const el = Object.fromEntries([...document.querySelectorAll('[id]')].map((n) => [n.id, n]));
+  const rootStyle = getComputedStyle(document.documentElement);
+  const token = (name) => rootStyle.getPropertyValue(name).trim();
+
+  const COLORS = {
+    paper: token('--paper'), paperInk: token('--paper-ink'), brass: token('--brass'),
+    glaze: token('--glaze'), glazeDeep: token('--glaze-deep'), celadon: token('--celadon'),
+    ivory: token('--ivory'), alert: token('--alert'),
+  };
+  const PLAYERS = [
+    { name: '주홍', glyph: '朱', ink: token('--shu'), sleeve: token('--shu-sleeve'), style: 'solid', key: 'shu' },
+    { name: '쪽빛', glyph: '藍', ink: token('--ai'), sleeve: token('--ai-sleeve'), style: 'ring', key: 'ai' },
+  ];
+  const SEAL_FONT = token('--font-seal') || 'serif';
+
+  // 움직임 줄이기 설정이면 연출 시간을 줄임
+  const REDUCED = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  const M = REDUCED ? 0.45 : 1;
+  const TIMING = { reach1: 430 * M, reach2: 380 * M, press: 170 * M, judge: 950 * M, cam: 420 * M };
+  const IMPACT_AT = TIMING.reach1 + TIMING.reach2 + TIMING.press;
+  const TAP_SLOP = 9;
+
+  /* ---------------- 작은 도구들 ---------------- */
+  const lerp = (a, b, k) => a + (b - a) * k;
+  const lerpP = (a, b, k) => ({ x: lerp(a.x, b.x, k), y: lerp(a.y, b.y, k) });
+  const easeOut = (k) => 1 - Math.pow(1 - k, 3);
+  const easeInOut = (k) => (k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2);
+  const D = () => stampDiameter(CONFIG);
+  function rgba(hex, a) {
+    const h = hex.replace('#', '');
+    const n = parseInt(h.length === 3 ? h.split('').map((c) => c + c).join('') : h, 16);
+    return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+  }
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = (a + 0x6d2b79f5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function hash2(x, y, seed) {
+    let h = (seed ^ Math.imul(x | 0, 374761393) ^ Math.imul(y | 0, 668265263)) | 0;
+    h = Math.imul(h ^ (h >>> 13), 1274126177);
+    return (h ^ (h >>> 16)) >>> 0;
+  }
+
+  /* ---------------- 설정 저장 (브라우저 저장소, 실패해도 동작) ---------------- */
+  const SETTINGS_KEY = 'stamp-omok/settings/v1';
+  const EDITABLE_KEYS = ['LINE_TOLERANCE', 'ANGLE_TOLERANCE_DEG', 'ARM_MAX_LENGTH', 'ARM_JITTER', 'FAIL_PENALTY',
+    'OVERLAP_ENDS_TURN', 'SHOW_LANDING_PREVIEW', 'SOUND', 'VIBRATION'];
+  function loadSettings() {
+    try {
+      const raw = localStorage.getItem(SETTINGS_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw);
+      for (const k of EDITABLE_KEYS) {
+        if (k in saved && typeof saved[k] === typeof CONFIG_DEFAULTS[k]) CONFIG[k] = saved[k];
+      }
+    } catch (e) { /* 저장소를 못 쓰면 기본값 */ }
+  }
+  function saveSettings() {
+    try {
+      const out = {};
+      for (const k of EDITABLE_KEYS) out[k] = CONFIG[k];
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(out));
+    } catch (e) { /* 무시 */ }
+  }
+  loadSettings();
+
+  /* ---------------- 효과음 (Web Audio로 합성, 파일 없음) ---------------- */
+  const Sound = (() => {
+    let ac = null, noise = null;
+    function ctx() {
+      if (!CONFIG.SOUND) return null;
+      try {
+        if (!ac) {
+          const AC = window.AudioContext || window.webkitAudioContext;
+          if (!AC) return null;
+          ac = new AC();
+        }
+        if (ac.state === 'suspended') ac.resume();
+        return ac;
+      } catch (e) { return null; }
+    }
+    function noiseBuffer(a) {
+      if (noise) return noise;
+      const len = Math.floor(a.sampleRate * 0.8);
+      noise = a.createBuffer(1, len, a.sampleRate);
+      const d = noise.getChannelData(0);
+      for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+      return noise;
+    }
+    function envelope(g, t, peak, attack, decay) {
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(peak, t + attack);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + attack + decay);
+    }
+    function tone(type, f0, f1, dur, peak, delay = 0) {
+      const a = ctx(); if (!a) return;
+      const t = a.currentTime + delay;
+      const o = a.createOscillator(), g = a.createGain();
+      o.type = type;
+      o.frequency.setValueAtTime(f0, t);
+      if (f1) o.frequency.exponentialRampToValueAtTime(f1, t + dur);
+      envelope(g, t, peak, 0.006, dur);
+      o.connect(g); g.connect(a.destination);
+      o.start(t); o.stop(t + dur + 0.05);
+    }
+    function hiss(freq, q, dur, peak, delay = 0, sweepTo = 0) {
+      const a = ctx(); if (!a) return;
+      const t = a.currentTime + delay;
+      const src = a.createBufferSource(); src.buffer = noiseBuffer(a);
+      const f = a.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = q;
+      f.frequency.setValueAtTime(freq, t);
+      if (sweepTo) f.frequency.exponentialRampToValueAtTime(sweepTo, t + dur);
+      const g = a.createGain(); envelope(g, t, peak, 0.012, dur);
+      src.connect(f); f.connect(g); g.connect(a.destination);
+      src.start(t); src.stop(t + dur + 0.05);
+    }
+    return {
+      unlock: () => ctx(),
+      tick: () => tone('triangle', 880, 660, 0.05, 0.07),
+      swish: () => hiss(420, 0.9, 0.7, 0.1, 0, 1900),                       // 팔 뻗는 소리
+      thump: () => { tone('sine', 150, 42, 0.24, 0.9); hiss(1500, 1.2, 0.08, 0.32); hiss(260, 0.8, 0.16, 0.22); }, // 도장 쿵
+      knock: () => { tone('sine', 95, 60, 0.16, 0.7); hiss(900, 2.2, 0.05, 0.3); tone('sine', 110, 70, 0.12, 0.45, 0.13); }, // 막힘
+      clack: () => { hiss(2600, 3, 0.05, 0.25); tone('triangle', 520, 380, 0.07, 0.12); }, // 자 내려놓기
+      sweep: () => hiss(700, 4, 0.8, 0.07, 0, 3200),
+      win: () => [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => tone('triangle', f, 0, 0.38, 0.22, i * 0.11)),
+      fail: () => { tone('triangle', 392, 370, 0.22, 0.2); tone('triangle', 311, 290, 0.36, 0.2, 0.18); },
+    };
+  })();
+  function buzz(pattern) {
+    if (!CONFIG.VIBRATION) return;
+    try { if (navigator.vibrate) navigator.vibrate(pattern); } catch (e) { /* 진동 미지원 */ }
+  }
+
+  /* ---------------- 도장 그림 (오프스크린 캔버스에 미리 그려 둠) ---------------- */
+  function roughCircle(g, r, rng, amp = 0.014, n = 80) {
+    g.beginPath();
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * TAU;
+      const rr = r * (1 + (rng() - 0.5) * 2 * amp);
+      const x = Math.cos(a) * rr, y = Math.sin(a) * rr;
+      if (i) g.lineTo(x, y); else g.moveTo(x, y);
+    }
+    g.closePath();
+  }
+  function makeSeal(meta, size, seed) {
+    const c = document.createElement('canvas');
+    c.width = c.height = size;
+    const g = c.getContext('2d');
+    const R = size / 2;
+    const rng = mulberry32(seed);
+    g.translate(R, R);
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    if (meta.style === 'solid') {
+      // 주홍: 꽉 찬 원 + 흰 글씨(백문인)
+      g.fillStyle = meta.ink;
+      roughCircle(g, R * 0.96, rng); g.fill();
+      g.strokeStyle = 'rgba(255,250,240,0.92)';
+      g.lineWidth = size * 0.03;
+      g.beginPath(); g.arc(0, 0, R * 0.8, 0, TAU); g.stroke();
+      g.fillStyle = 'rgba(255,250,240,0.96)';
+      g.font = `700 ${Math.round(size * 0.54)}px ${SEAL_FONT}`;
+      g.fillText(meta.glyph, 0, size * 0.035);
+    } else {
+      // 쪽빛: 굵은 고리 + 네모 인면 + 색 글씨(주문인)
+      g.fillStyle = rgba(meta.ink, 0.12);
+      roughCircle(g, R * 0.95, rng); g.fill();
+      g.strokeStyle = meta.ink;
+      g.lineWidth = size * 0.08;
+      g.beginPath(); g.arc(0, 0, R * 0.9, 0, TAU); g.stroke();
+      const s = R * 1.0;
+      g.lineWidth = size * 0.04;
+      g.strokeRect(-s / 2, -s / 2, s, s);
+      g.fillStyle = meta.ink;
+      g.font = `700 ${Math.round(size * 0.4)}px ${SEAL_FONT}`;
+      g.fillText(meta.glyph, 0, size * 0.025);
+    }
+    // 인주가 덜 묻은 반점과 이 빠진 가장자리
+    g.globalCompositeOperation = 'destination-out';
+    for (let i = 0; i < 240; i++) {
+      const a = rng() * TAU, r = Math.sqrt(rng()) * R;
+      g.globalAlpha = 0.2 + rng() * 0.65;
+      g.beginPath(); g.arc(Math.cos(a) * r, Math.sin(a) * r, (0.4 + rng() * 1.7) * (size / 192), 0, TAU); g.fill();
+    }
+    for (let i = 0; i < 16; i++) {
+      const a = rng() * TAU, r = R * (0.9 + rng() * 0.1);
+      g.globalAlpha = 0.45 + rng() * 0.5;
+      g.beginPath(); g.arc(Math.cos(a) * r, Math.sin(a) * r, size * (0.008 + rng() * 0.028), 0, TAU); g.fill();
+    }
+    g.globalCompositeOperation = 'source-over';
+    g.globalAlpha = 1;
+    return c;
+  }
+  const SEALS = PLAYERS.map((p, i) => [0, 1, 2].map((v) => makeSeal(p, 160, 1000 + i * 17 + v * 101)));
+  const SEAL_URL = PLAYERS.map((p, i) => makeSeal(p, 160, 77 + i).toDataURL());
+  el.menuSealA.src = makeSeal(PLAYERS[0], 360, 5).toDataURL();
+  el.menuSealB.src = makeSeal(PLAYERS[1], 200, 9).toDataURL();
+
+  /* ---------------- 한지: 결(타일) + 덩어리별 섬유·얼룩(기억의 이정표) ---------------- */
+  const Paper = (() => {
+    const CHUNK = 360;
+    let seed = 1, cache = new Map(), pattern = null;
+    const grain = document.createElement('canvas');
+    grain.width = grain.height = 256;
+    (function buildGrain() {
+      const g = grain.getContext('2d');
+      const img = g.createImageData(256, 256);
+      const d = img.data;
+      const rng = mulberry32(99);
+      for (let i = 0; i < d.length; i += 4) {
+        const n = rng();
+        if (n < 0.42) { d[i] = 96; d[i + 1] = 82; d[i + 2] = 58; d[i + 3] = 6 + rng() * 16; }
+        else if (n > 0.86) { d[i] = 255; d[i + 1] = 252; d[i + 2] = 244; d[i + 3] = 14 + rng() * 26; }
+      }
+      g.putImageData(img, 0, 0);
+      // 구름 같은 얼룩: 타일 경계에서 끊기지 않게 8방향 복제
+      for (let k = 0; k < 14; k++) {
+        const x = rng() * 256, y = rng() * 256, r = 20 + rng() * 60;
+        for (const ox of [-256, 0, 256]) for (const oy of [-256, 0, 256]) {
+          const gr = g.createRadialGradient(x + ox, y + oy, 0, x + ox, y + oy, r);
+          gr.addColorStop(0, 'rgba(150,128,90,0.05)');
+          gr.addColorStop(1, 'rgba(150,128,90,0)');
+          g.fillStyle = gr;
+          g.fillRect(x + ox - r, y + oy - r, r * 2, r * 2);
+        }
+      }
+    })();
+    document.documentElement.style.setProperty('--grain', `url(${grain.toDataURL()})`);
+
+    function reset(s) { seed = s >>> 0; cache.clear(); }
+    function chunk(cx, cy) {
+      const key = cx + ',' + cy;
+      let c = cache.get(key);
+      if (c) return c;
+      if (cache.size > 700) cache.clear();
+      const rng = mulberry32(hash2(cx, cy, seed));
+      const x0 = cx * CHUNK, y0 = cy * CHUNK;
+      const fibers = [];
+      const n = 5 + Math.floor(rng() * 7);
+      for (let i = 0; i < n; i++) {
+        const x = x0 + rng() * CHUNK, y = y0 + rng() * CHUNK;
+        const len = 16 + rng() * 66, a = rng() * Math.PI, bend = (rng() - 0.5) * len * 0.5;
+        const dx = Math.cos(a) * len, dy = Math.sin(a) * len;
+        fibers.push({
+          x, y, ex: x + dx, ey: y + dy,
+          qx: x + dx / 2 - Math.sin(a) * bend, qy: y + dy / 2 + Math.cos(a) * bend,
+          w: 0.5 + rng() * 1.3, light: rng() < 0.3, a: 0.1 + rng() * 0.2,
+        });
+      }
+      const blots = [];
+      if (rng() < 0.28) blots.push({ x: x0 + rng() * CHUNK, y: y0 + rng() * CHUNK, r: 26 + rng() * 70, a: 0.04 + rng() * 0.05 });
+      const flecks = [];
+      if (rng() < 0.35) {
+        const nf = 1 + Math.floor(rng() * 2);
+        for (let i = 0; i < nf; i++) flecks.push({ x: x0 + rng() * CHUNK, y: y0 + rng() * CHUNK, rx: 1.2 + rng() * 2.4, ry: 0.6 + rng() * 1.2, rot: rng() * Math.PI, a: 0.25 + rng() * 0.3 });
+      }
+      c = { fibers, blots, flecks };
+      cache.set(key, c);
+      return c;
+    }
+    function draw(g, v) {
+      if (!pattern) pattern = g.createPattern(grain, 'repeat');
+      // 현재 변환(월드 좌표)에서 채우므로 결이 종이에 붙어 함께 움직임
+      g.fillStyle = pattern;
+      g.fillRect(v.x0, v.y0, v.x1 - v.x0, v.y1 - v.y0);
+      const cx0 = Math.floor(v.x0 / CHUNK) - 1, cx1 = Math.floor(v.x1 / CHUNK);
+      const cy0 = Math.floor(v.y0 / CHUNK) - 1, cy1 = Math.floor(v.y1 / CHUNK);
+      for (let cy = cy0; cy <= cy1; cy++) {
+        for (let cx = cx0; cx <= cx1; cx++) {
+          const c = chunk(cx, cy);
+          for (const b of c.blots) {
+            const gr = g.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.r);
+            gr.addColorStop(0, `rgba(160,130,80,${b.a})`);
+            gr.addColorStop(1, 'rgba(160,130,80,0)');
+            g.fillStyle = gr;
+            g.fillRect(b.x - b.r, b.y - b.r, b.r * 2, b.r * 2);
+          }
+          g.lineCap = 'round';
+          for (const f of c.fibers) {
+            g.strokeStyle = f.light ? `rgba(255,253,246,${f.a + 0.2})` : `rgba(104,88,62,${f.a})`;
+            g.lineWidth = f.w;
+            g.beginPath(); g.moveTo(f.x, f.y); g.quadraticCurveTo(f.qx, f.qy, f.ex, f.ey); g.stroke();
+          }
+          for (const f of c.flecks) {
+            g.fillStyle = `rgba(82,64,42,${f.a})`;
+            g.beginPath(); g.ellipse(f.x, f.y, f.rx, f.ry, f.rot, 0, TAU); g.fill();
+          }
+        }
+      }
+    }
+    return { reset, draw };
+  })();
+
+  /* ---------------- 캔버스 · 카메라 ---------------- */
+  const canvas = el.board;
+  const ctx = canvas.getContext('2d');
+  let DPR = 1, VW = 1, VH = 1, vignette = null;
+  const cam = { x: 0, y: 0, zoom: 1, tween: null };
+
+  function resize() {
+    const r = el.stage.getBoundingClientRect();
+    VW = Math.max(1, r.width); VH = Math.max(1, r.height);
+    DPR = Math.min(window.devicePixelRatio || 1, 2.5);
+    canvas.width = Math.round(VW * DPR);
+    canvas.height = Math.round(VH * DPR);
+    vignette = ctx.createRadialGradient(VW / 2, VH / 2, Math.min(VW, VH) * 0.35, VW / 2, VH / 2, Math.hypot(VW, VH) * 0.62);
+    vignette.addColorStop(0, 'rgba(90,70,40,0)');
+    vignette.addColorStop(1, 'rgba(90,70,40,0.16)');
+    requestRender();
+  }
+  const defaultZoom = () => clamp(VW / (CONFIG.VIEW_WIDTH_D * D()), CONFIG.ZOOM_MIN, CONFIG.ZOOM_MAX);
+  const worldToScreen = (p) => ({ x: (p.x - cam.x) * cam.zoom + VW / 2, y: (p.y - cam.y) * cam.zoom + VH / 2 });
+  const screenToWorld = (sx, sy) => ({ x: (sx - VW / 2) / cam.zoom + cam.x, y: (sy - VH / 2) / cam.zoom + cam.y });
+  function setWorldTransform() {
+    const z = cam.zoom * DPR;
+    ctx.setTransform(z, 0, 0, z, DPR * (VW / 2 - cam.x * cam.zoom), DPR * (VH / 2 - cam.y * cam.zoom));
+  }
+  function zoomAt(sx, sy, factor) {
+    const before = screenToWorld(sx, sy);
+    cam.zoom = clamp(cam.zoom * factor, CONFIG.ZOOM_MIN, CONFIG.ZOOM_MAX);
+    const after = screenToWorld(sx, sy);
+    cam.x += before.x - after.x;
+    cam.y += before.y - after.y;
+  }
+  function tweenCam(x, y, zoom) {
+    cam.tween = { from: { x: cam.x, y: cam.y, zoom: cam.zoom }, to: { x, y, zoom: clamp(zoom, CONFIG.ZOOM_MIN, CONFIG.ZOOM_MAX) }, t0: performance.now() };
+    requestRender();
+  }
+  function updateCam(now) {
+    const t = cam.tween;
+    if (!t) return false;
+    const k = easeInOut(clamp((now - t.t0) / TIMING.cam, 0, 1));
+    cam.x = lerp(t.from.x, t.to.x, k);
+    cam.y = lerp(t.from.y, t.to.y, k);
+    cam.zoom = t.from.zoom * Math.pow(t.to.zoom / t.from.zoom, k);
+    if (k >= 1) cam.tween = null;
+    return true;
+  }
+  /** 도장들이 모두 보이도록 카메라 맞춤 (없으면 판 가운데) */
+  function fitView(points) {
+    if (!points.length) { tweenCam(0, 0, defaultZoom()); return; }
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const p of points) { x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y); x1 = Math.max(x1, p.x); y1 = Math.max(y1, p.y); }
+    const pad = D() * 2.5;
+    const z = Math.min(VW / (x1 - x0 + pad * 2), VH / (y1 - y0 + pad * 2), defaultZoom() * 1.4);
+    tweenCam((x0 + x1) / 2, (y0 + y1) / 2, z);
+  }
+
+  /* ---------------- 게임 상태 ---------------- */
+  let state = null;
+  const cur = () => state.players[state.current];
+  const countStamps = (id) => state.stamps.reduce((n, s) => n + (s.owner === id ? 1 : 0), 0);
+  const isRevealed = () => !!state && ['ruler', 'judging', 'result', 'over'].includes(state.phase);
+  const rulerAngle = (r) => (-r.deg * Math.PI) / 180;          // 화면에서 반시계 방향이 + 각도
+  const rulerForJudge = (r) => ({ x: r.x, y: r.y, angle: rulerAngle(r) });
+
+  function makePlayer(id) {
+    return { id, armLength: CONFIG.ARM_DEFAULT_LENGTH, dir: id === 0 ? 'right' : 'left',
+      cam: null, ownTurns: 0, rulerBlockedUntil: 0, skip: 0 };
+  }
+  function newGame() {
+    state = {
+      seed: (Math.random() * 2147483647) | 0,
+      phase: 'handoff', current: 0, move: 1,
+      stamps: [], nextId: 1,
+      players: [makePlayer(0), makePlayer(1)],
+      anchor: null, ruler: null, judge: null, anim: null, winner: null, lastAction: null,
+    };
+    Paper.reset(state.seed);
+    cam.tween = null; cam.x = 0; cam.y = 0; cam.zoom = defaultZoom();
+    el.banner.hidden = true;
+    closeAll();
+    showHandoff();
+  }
+
+  /** 턴 교체 가림막 */
+  function showHandoff() {
+    state.phase = 'handoff';
+    state.anchor = null; state.ruler = null; state.judge = null; state.anim = null;
+    el.banner.hidden = true;
+    const P = cur(), me = PLAYERS[P.id], other = PLAYERS[1 - P.id];
+    el.handoff.className = `overlay p-${me.key}`;
+    el.handoffSeal.src = SEAL_URL[P.id];
+    el.handoffEyebrow.textContent = `${state.move}수째 · ${me.name} 도장 ${countStamps(P.id)}개`;
+    const last = state.lastAction;
+    el.handoffLast.hidden = !last;
+    if (last) el.handoffLast.textContent = `지난 수 · ${PLAYERS[last.player].name} ${last.label}`;
+    if (P.skip > 0) {
+      el.handoffTitle.textContent = `${me.name}은 이번 차례를 쉽니다`;
+      el.handoffBody.textContent = '자 확인에 실패한 벌칙이에요. 기기를 그대로 상대에게 넘기세요.';
+      el.btnReady.textContent = '확인, 넘기기';
+      el.btnReady.dataset.mode = 'skip';
+    } else {
+      el.handoffTitle.textContent = state.move === 1 ? `${me.name}부터 시작합니다` : `기기를 ${me.name}에게 넘기세요`;
+      el.handoffBody.textContent = `${other.name}은 화면을 보지 마세요. 판은 가려진 채로 열립니다.`;
+      el.btnReady.textContent = `${me.name}, 준비됐어요`;
+      el.btnReady.dataset.mode = 'ready';
+    }
+    document.body.dataset.player = me.key;
+    openOverlay('handoff');
+    syncUI();
+  }
+  function onReady() {
+    Sound.unlock();
+    if (el.btnReady.dataset.mode === 'skip') {
+      const P = cur();
+      P.skip = Math.max(0, P.skip - 1);
+      state.lastAction = { player: P.id, label: '쉼' };
+      state.current = 1 - state.current;
+      state.move++;
+      showHandoff();
+      return;
+    }
+    beginTurn();
+  }
+  function beginTurn() {
+    closeOverlay('handoff');
+    const P = cur();
+    P.ownTurns++;
+    P.armLength = clamp(P.armLength, CONFIG.ARM_MIN_LENGTH, CONFIG.ARM_MAX_LENGTH);
+    cam.tween = null;
+    if (P.cam) Object.assign(cam, P.cam);
+    else { cam.x = 0; cam.y = 0; cam.zoom = defaultZoom(); }
+    state.phase = 'stamp';
+    state.anchor = null;
+    syncUI();
+    requestRender();
+  }
+  function endTurn(label) {
+    const P = cur();
+    P.cam = { x: cam.x, y: cam.y, zoom: cam.zoom };
+    state.lastAction = { player: P.id, label };
+    state.current = 1 - state.current;
+    state.move++;
+    showHandoff();
+  }
+
+  /* ---------------- 행동 A: 도장 찍기 ---------------- */
+  function placeStamp() {
+    if (!state || state.phase !== 'stamp' || !state.anchor) return;
+    const P = cur();
+    const arm = computeArm(state.anchor, P.armLength, P.dir, CONFIG);
+    const target = applyJitter(arm.hand, CONFIG, Math.random);
+    const blocker = findOverlap(target, state.stamps, CONFIG);
+    state.phase = 'animating';
+    state.anim = {
+      t0: performance.now(), arm, target, owner: P.id, blocked: !!blocker, impact: false, stamp: null,
+      rot: (Math.random() - 0.5) * 0.45, variant: (Math.random() * 3) | 0,
+    };
+    Sound.swish();
+    buzz(8);
+    syncUI();
+    requestRender();
+  }
+  function armEndTime(a) {
+    return IMPACT_AT + (a.blocked ? 1000 * M : Math.max(CONFIG.STAMP_FLASH_MS, 650 * M));
+  }
+  function updateArm(now) {
+    const a = state.anim;
+    if (!a) return false;
+    const t = now - a.t0;
+    if (!a.impact && t >= IMPACT_AT) {
+      a.impact = true;
+      if (a.blocked) {
+        Sound.knock();
+        buzz([20, 40, 30]);
+        toast('쿵! 무언가에 막혀 찍히지 않았어요', 'warn');
+      } else {
+        a.stamp = { id: state.nextId++, x: a.target.x, y: a.target.y, owner: a.owner, rot: a.rot, variant: a.variant, move: state.move };
+        state.stamps.push(a.stamp);
+        Sound.thump();
+        buzz(35);
+      }
+    }
+    if (t >= armEndTime(a)) {
+      state.anim = null;
+      if (a.blocked && !CONFIG.OVERLAP_ENDS_TURN) {
+        state.phase = 'stamp';
+        syncUI();
+      } else {
+        endTurn('도장 찍기');
+      }
+      return false;
+    }
+    return true;
+  }
+
+  /* ---------------- 행동 B: 자 확인 ---------------- */
+  const rulerBlockedLeft = (P) => Math.max(0, P.rulerBlockedUntil - P.ownTurns + 1);
+  function penaltyText() {
+    if (CONFIG.FAIL_PENALTY === 'skip') return '실패하면 다음 차례를 한 번 쉽니다';
+    if (CONFIG.FAIL_PENALTY === 'cooldown') return `실패하면 내 다음 ${CONFIG.COOLDOWN_TURNS}차례 동안 자를 쓸 수 없어요`;
+    return '실패하면 차례만 넘어갑니다';
+  }
+  async function askRuler() {
+    if (!state || state.phase !== 'stamp') return;
+    const P = cur();
+    if (rulerBlockedLeft(P) > 0) return;
+    const mine = countStamps(P.id);
+    const lines = [
+      '<p>이번 차례는 자 확인으로 끝나요. 판 위의 모든 도장이 <b>두 사람 모두에게</b> 보입니다.</p>',
+      `<p>${penaltyText()}.</p>`,
+    ];
+    if (mine < CONFIG.WIN_COUNT) lines.push(`<p class="warn">아직 내 도장이 ${mine}개라 이번엔 이길 수 없어요. 판만 보고 차례를 넘기게 됩니다.</p>`);
+    const ok = await confirmDialog({ title: '자를 대면 판이 공개됩니다', body: lines.join(''), ok: '자 대기', cancel: '그만두기' });
+    if (ok) startRuler();
+  }
+  function startRuler() {
+    const pts = state.stamps;
+    let cx, cy;
+    if (pts.length) {
+      cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
+      cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
+    } else {
+      const c = screenToWorld(VW / 2, VH / 2); cx = c.x; cy = c.y;
+    }
+    state.ruler = { x: cx, y: cy, deg: 0 };
+    state.phase = 'ruler';
+    state.judge = null;
+    state.anchor = null;
+    fitView(pts);
+    Sound.clack();
+    buzz(12);
+    toast('판 공개! 이제 두 사람 모두 화면을 볼 수 있어요');
+    syncUI();
+  }
+  function setRulerDeg(deg) {
+    if (!state || !state.ruler) return;
+    state.ruler.deg = ((deg % 180) + 180) % 180;
+    syncRulerUI();
+    requestRender();
+  }
+  function runJudge() {
+    if (!state || state.phase !== 'ruler') return;
+    const res = judgeRuler(rulerForJudge(state.ruler), state.stamps, state.current, CONFIG);
+    state.judge = { ...res, t0: performance.now() };
+    state.phase = 'judging';
+    Sound.sweep();
+    syncUI();
+    requestRender();
+  }
+  function updateJudge(now) {
+    if (state.phase !== 'judging') return false;
+    if (now - state.judge.t0 < TIMING.judge) return true;
+    finishJudge();
+    return true;
+  }
+  function finishJudge() {
+    const res = state.judge, P = cur(), me = PLAYERS[P.id];
+    if (res.success) {
+      state.phase = 'over';
+      state.winner = P.id;
+      Sound.win();
+      buzz([40, 60, 40, 60, 140]);
+      el.bannerSeal.src = SEAL_URL[P.id];
+      el.bannerTitle.textContent = `${me.name} 승리`;
+      el.bannerSub.textContent = `${state.move}수 만에 다섯 줄 입증`;
+      el.banner.hidden = false;
+      el.overMsg.textContent = res.message;
+    } else {
+      state.phase = 'result';
+      Sound.fail();
+      buzz([60, 40, 60]);
+      let pen = '차례만 넘어가요';
+      if (CONFIG.FAIL_PENALTY === 'skip') { P.skip = 1; pen = '벌칙: 다음 차례 쉼'; }
+      else if (CONFIG.FAIL_PENALTY === 'cooldown') { P.rulerBlockedUntil = P.ownTurns + CONFIG.COOLDOWN_TURNS; pen = `벌칙: ${CONFIG.COOLDOWN_TURNS}차례 자 확인 금지`; }
+      el.resultPenalty.textContent = pen;
+      el.resultMsg.textContent = res.message;
+    }
+    syncUI();
+  }
+
+  /* ---------------- 그리기 ---------------- */
+  let renderQueued = false;
+  function requestRender() {
+    if (renderQueued) return;
+    renderQueued = true;
+    requestAnimationFrame(frame);
+  }
+  function frame(now) {
+    renderQueued = false;
+    let busy = updateCam(now);
+    if (state) {
+      busy = updateArm(now) || busy;
+      busy = updateJudge(now) || busy;
+    }
+    render(now);
+    if (busy) requestRender();
+  }
+
+  function render(now) {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = COLORS.paper;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    setWorldTransform();
+    const a = screenToWorld(0, 0), b = screenToWorld(VW, VH);
+    Paper.draw(ctx, { x0: a.x, y0: a.y, x1: b.x, y1: b.y });
+    drawOriginMark();
+    if (state) {
+      if (isRevealed()) drawStamps(state.stamps);
+      if (state.phase === 'stamp') drawGuides();
+      if (state.anim) drawArmAnim(now);
+      if (state.ruler && isRevealed()) { drawRuler(); drawJudge(now); }
+    }
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    if (vignette) { ctx.fillStyle = vignette; ctx.fillRect(0, 0, VW, VH); }
+    drawScaleBar();
+  }
+
+  function circlePath(x, y, r) { ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); }
+  function linePath(pts) { ctx.beginPath(); pts.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))); }
+  function roundRectPath(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  /** 판 가운데의 옅은 십자: 두 사람이 공유하는 유일한 인쇄 표시 */
+  function drawOriginMark() {
+    const px = 1 / cam.zoom, s = D() * 0.35;
+    ctx.strokeStyle = rgba(COLORS.paperInk, 0.22);
+    ctx.lineWidth = 1.2 * px;
+    ctx.beginPath();
+    ctx.moveTo(-s, 0); ctx.lineTo(s, 0); ctx.moveTo(0, -s); ctx.lineTo(0, s);
+    ctx.stroke();
+  }
+
+  function drawSeal(s, alpha = 1) {
+    const Dw = D();
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.translate(s.x, s.y);
+    ctx.rotate(s.rot || 0);
+    ctx.drawImage(SEALS[s.owner][s.variant || 0], -Dw / 2, -Dw / 2, Dw, Dw);
+    ctx.restore();
+  }
+  function drawStamps(list) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'multiply';   // 인주가 종이결에 스며든 느낌
+    for (const s of list) drawSeal(s);
+    ctx.restore();
+  }
+
+  /** 도장 찍기 단계의 최소 안내: 이번 차례 내 팔 기준점(+ 설정 시 착지점 미리보기). 지난 차례 기준점은 남기지 않음 */
+  function drawGuides() {
+    const P = cur(), me = PLAYERS[P.id], px = 1 / cam.zoom;
+    const A = state.anchor;
+    if (!A) return;
+    if (CONFIG.SHOW_LANDING_PREVIEW) {
+      const arm = computeArm(A, P.armLength, P.dir, CONFIG);
+      ctx.save();
+      ctx.setLineDash([6 * px, 5 * px]);
+      ctx.strokeStyle = rgba(me.sleeve, 0.6);
+      ctx.lineWidth = 2 * px;
+      linePath([arm.start, arm.elbow, arm.hand]); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.strokeStyle = rgba(me.ink, 0.7);
+      circlePath(arm.hand.x, arm.hand.y, D() / 2); ctx.stroke();
+      ctx.restore();
+    }
+    // 어깨(기준점)
+    ctx.save();
+    ctx.translate(A.x, A.y);
+    ctx.fillStyle = rgba(me.sleeve, 0.18);
+    circlePath(0, 0, 22 * px); ctx.fill();
+    ctx.fillStyle = me.sleeve;
+    circlePath(0, 0, 9 * px); ctx.fill();
+    ctx.strokeStyle = COLORS.ivory;
+    ctx.lineWidth = 2 * px;
+    ctx.stroke();
+    // 앞쪽 화살표와 꺾임 표시 — 길이는 화면 기준 고정이라 착지 거리를 드러내지 않음
+    const s = P.dir === 'left' ? -1 : 1;
+    ctx.strokeStyle = me.sleeve;
+    ctx.lineWidth = 2.4 * px;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(0, -14 * px); ctx.lineTo(0, -34 * px); ctx.lineTo(s * 13 * px, -34 * px);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(s * 13 * px, -34 * px); ctx.lineTo(s * 8 * px, -39 * px);
+    ctx.moveTo(s * 13 * px, -34 * px); ctx.lineTo(s * 8 * px, -29 * px);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  /** 팔이 펴지며 도장을 찍는 연출 */
+  function drawArmAnim(now) {
+    const a = state.anim, me = PLAYERS[a.owner], Dw = D(), px = 1 / cam.zoom;
+    const t = now - a.t0;
+    const e1 = easeOut(clamp(t / TIMING.reach1, 0, 1));
+    const e2 = easeOut(clamp((t - TIMING.reach1) / TIMING.reach2, 0, 1));
+    const S = a.arm.start, E = a.arm.elbow, H = a.target;
+    const pts = [S, lerpP(S, E, e1)];
+    if (e1 >= 1) pts.push(lerpP(E, H, e2));
+    let tip = pts[pts.length - 1];
+    if (a.blocked && t > IMPACT_AT) {
+      const k = t - IMPACT_AT;
+      const shake = Math.sin(k / 16) * Dw * 0.14 * Math.max(0, 1 - k / (450 * M));
+      tip = { x: tip.x + shake, y: tip.y };
+      pts[pts.length - 1] = tip;
+    }
+
+    // 찍힌 도장: 판은 가려 둔 채, 방금 찍은 내 도장만 잠깐 보였다 사라짐
+    if (a.stamp && !isRevealed()) {
+      const k = t - IMPACT_AT, flash = CONFIG.STAMP_FLASH_MS;
+      const alpha = k < flash - 420 ? 1 : clamp((flash - k) / 420, 0, 1);
+      ctx.save(); ctx.globalCompositeOperation = 'multiply'; drawSeal(a.stamp, alpha); ctx.restore();
+      const kb = k / (340 * M);
+      if (kb < 1) {
+        ctx.strokeStyle = rgba(me.ink, 0.4 * (1 - kb));
+        ctx.lineWidth = 3 * px;
+        circlePath(a.stamp.x, a.stamp.y, (Dw / 2) * (1 + 0.55 * kb)); ctx.stroke();
+      }
+    }
+
+    // 팔이 다 찍은 뒤 서서히 사라짐
+    const fade = t > IMPACT_AT + 140 * M ? clamp(1 - (t - IMPACT_AT - 140 * M) / (380 * M), 0, 1) : 1;
+    if (fade > 0) {
+      ctx.save();
+      ctx.globalAlpha = fade;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      const shadowOff = Dw * 0.14;
+      ctx.strokeStyle = 'rgba(40,28,16,0.16)';
+      ctx.lineWidth = Dw * 0.6;
+      linePath(pts.map((p) => ({ x: p.x + shadowOff, y: p.y + shadowOff * 1.3 }))); ctx.stroke();
+      ctx.strokeStyle = me.sleeve;
+      ctx.lineWidth = Dw * 0.56;
+      linePath(pts); ctx.stroke();
+      ctx.strokeStyle = rgba(me.ink, 0.6);
+      ctx.lineWidth = Dw * 0.16;
+      linePath(pts); ctx.stroke();
+      ctx.fillStyle = me.sleeve;
+      circlePath(S.x, S.y, Dw * 0.36); ctx.fill();
+      // 손에 쥔 도장 손잡이 (위에서 내려다본 나무 원기둥): 들렸다가 눌렸다가 다시 들림
+      const press = clamp((t - TIMING.reach1 - TIMING.reach2) / TIMING.press, 0, 1);
+      const lift = t < IMPACT_AT ? 1 - press * press : easeOut(clamp((t - IMPACT_AT) / (220 * M), 0, 1));
+      const r = Dw * 0.42 * (1 + 0.22 * lift);
+      ctx.fillStyle = 'rgba(40,28,16,0.22)';
+      circlePath(tip.x + Dw * 0.22 * lift, tip.y + Dw * 0.3 * lift, r); ctx.fill();
+      ctx.fillStyle = '#b4834f';
+      circlePath(tip.x, tip.y, r); ctx.fill();
+      ctx.strokeStyle = '#7a5530';
+      ctx.lineWidth = 1.5 * px;
+      ctx.stroke();
+      ctx.fillStyle = '#cfa274';
+      circlePath(tip.x - r * 0.15, tip.y - r * 0.15, r * 0.55); ctx.fill();
+      ctx.restore();
+    }
+
+    // 막힘 표시
+    if (a.blocked && t > IMPACT_AT) {
+      const k = clamp((t - IMPACT_AT) / (160 * M), 0, 1), s = Dw * 0.38 * k;
+      ctx.save();
+      ctx.strokeStyle = COLORS.alert;
+      ctx.lineWidth = 4 * px;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(H.x - s, H.y - s); ctx.lineTo(H.x + s, H.y + s);
+      ctx.moveTo(H.x + s, H.y - s); ctx.lineTo(H.x - s, H.y + s);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  function rulerEnds(r) {
+    const half = (CONFIG.RULER_LENGTH * D()) / 2, ang = rulerAngle(r);
+    const ux = Math.cos(ang), uy = Math.sin(ang);
+    return [{ x: r.x - ux * half, y: r.y - uy * half }, { x: r.x + ux * half, y: r.y + uy * half }];
+  }
+  /** 반투명 청자빛 아크릴 자: 가운데 선 + 허용 오차 띠 + 도장 반 개 간격 눈금 */
+  function drawRuler() {
+    const r = state.ruler, Dw = D(), px = 1 / cam.zoom;
+    const half = (CONFIG.RULER_LENGTH * Dw) / 2, w = CONFIG.RULER_WIDTH * Dw, tol = CONFIG.LINE_TOLERANCE * Dw;
+    ctx.save();
+    ctx.translate(r.x, r.y);
+    ctx.rotate(rulerAngle(r));
+    ctx.fillStyle = 'rgba(30,40,36,0.14)';
+    roundRectPath(-half + 3 * px, -w / 2 + 5 * px, half * 2, w, 0.14 * Dw); ctx.fill();
+    ctx.fillStyle = rgba(COLORS.celadon, 0.4);
+    roundRectPath(-half, -w / 2, half * 2, w, 0.14 * Dw); ctx.fill();
+    ctx.strokeStyle = rgba(COLORS.glaze, 0.8);
+    ctx.lineWidth = 1.5 * px;
+    ctx.stroke();
+    ctx.fillStyle = rgba(COLORS.brass, 0.22);
+    ctx.fillRect(-half, -tol, half * 2, tol * 2);
+    ctx.strokeStyle = rgba(COLORS.brass, 0.75);
+    ctx.lineWidth = 1 * px;
+    ctx.setLineDash([5 * px, 4 * px]);
+    ctx.beginPath();
+    ctx.moveTo(-half, -tol); ctx.lineTo(half, -tol);
+    ctx.moveTo(-half, tol); ctx.lineTo(half, tol);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.strokeStyle = COLORS.glazeDeep;
+    ctx.lineWidth = 1.4 * px;
+    ctx.beginPath(); ctx.moveTo(-half, 0); ctx.lineTo(half, 0); ctx.stroke();
+    ctx.strokeStyle = rgba(COLORS.glazeDeep, 0.85);
+    ctx.lineWidth = 1 * px;
+    ctx.beginPath();
+    for (let k = -CONFIG.RULER_LENGTH; k <= CONFIG.RULER_LENGTH; k++) {
+      const x = (k * Dw) / 2, len = (k % 2 === 0 ? 0.3 : 0.16) * Dw;
+      ctx.moveTo(x, -w / 2); ctx.lineTo(x, -w / 2 + len);
+      ctx.moveTo(x, w / 2); ctx.lineTo(x, w / 2 - len);
+    }
+    ctx.stroke();
+    ctx.restore();
+    if (state.phase === 'ruler') {
+      for (const e of rulerEnds(r)) {
+        ctx.fillStyle = COLORS.brass;
+        circlePath(e.x, e.y, 13 * px); ctx.fill();
+        ctx.strokeStyle = COLORS.ivory;
+        ctx.lineWidth = 2.5 * px;
+        ctx.stroke();
+        ctx.fillStyle = COLORS.glazeDeep;
+        circlePath(e.x, e.y, 3 * px); ctx.fill();
+      }
+    }
+  }
+  function ringStamp(s, color, width, extra = 4) {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width / cam.zoom;
+    circlePath(s.x, s.y, D() / 2 + extra / cam.zoom); ctx.stroke();
+  }
+  /** 판정 과정·결과 시각화 */
+  function drawJudge(now) {
+    const r = state.ruler, Dw = D(), px = 1 / cam.zoom;
+    if (state.phase === 'ruler') {
+      for (const c of rulerCandidates(rulerForJudge(r), state.stamps, state.current, CONFIG)) ringStamp(c.s, COLORS.brass, 2.5);
+      return;
+    }
+    const j = state.judge;
+    if (!j) return;
+    if (state.phase === 'judging') {
+      // 자를 따라 빛이 훑고 지나가며 허용 띠 안 도장을 하나씩 짚음
+      const k = clamp((now - j.t0) / TIMING.judge, 0, 1), half = (CONFIG.RULER_LENGTH * Dw) / 2;
+      const ang = rulerAngle(r), pos = -half + 2 * half * easeInOut(k);
+      const gx = r.x + Math.cos(ang) * pos, gy = r.y + Math.sin(ang) * pos;
+      const gr = ctx.createRadialGradient(gx, gy, 0, gx, gy, Dw * 1.2);
+      gr.addColorStop(0, rgba(COLORS.brass, 0.55));
+      gr.addColorStop(1, rgba(COLORS.brass, 0));
+      ctx.fillStyle = gr;
+      circlePath(gx, gy, Dw * 1.2); ctx.fill();
+      for (const s of j.candidates) {
+        if (projectOnLine(s, r, ang).t <= pos) ringStamp(s, COLORS.brass, 2.5);
+      }
+      return;
+    }
+    const ink = PLAYERS[state.current].ink;
+    for (const s of j.candidates) ringStamp(s, rgba(COLORS.brass, 0.75), 2);
+    const pts = j.ordered || j.chosen;
+    if (j.fit && pts) {
+      // 최소제곱 피팅 직선
+      const f = j.fit;
+      let tMin = Infinity, tMax = -Infinity;
+      for (const p of pts) { const t = projectOnLine(p, { x: f.cx, y: f.cy }, f.angle).t; tMin = Math.min(tMin, t); tMax = Math.max(tMax, t); }
+      tMin -= Dw * 0.8; tMax += Dw * 0.8;
+      ctx.save();
+      ctx.strokeStyle = j.success ? ink : COLORS.alert;
+      ctx.lineWidth = (j.success ? 3 : 2) * px;
+      if (!j.success) ctx.setLineDash([7 * px, 5 * px]);
+      ctx.beginPath();
+      ctx.moveTo(f.cx + f.ux * tMin, f.cy + f.uy * tMin);
+      ctx.lineTo(f.cx + f.ux * tMax, f.cy + f.uy * tMax);
+      ctx.stroke();
+      ctx.restore();
+      if (j.success) for (const p of pts) ringStamp(p, COLORS.brass, 4, 5);
+      // 줄 순서 번호
+      ctx.save();
+      ctx.font = `700 ${11 * px}px ${token('--font-body')}`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      pts.forEach((p, i) => {
+        const bx = p.x - f.uy * (Dw * 0.5 + 12 * px), by = p.y + f.ux * (Dw * 0.5 + 12 * px);
+        ctx.fillStyle = j.success ? COLORS.brass : COLORS.glazeDeep;
+        circlePath(bx, by, 8 * px); ctx.fill();
+        ctx.fillStyle = COLORS.ivory;
+        ctx.fillText(String(i + 1), bx, by + 0.5 * px);
+      });
+      ctx.restore();
+    }
+    ctx.save();
+    if (j.code === 'NOT_STRAIGHT' && j.fit) {
+      const p = j.chosen[j.fit.worst];
+      ringStamp(p, COLORS.alert, 3, 6);
+    } else if (j.code === 'GAP' && j.ordered) {
+      const p = j.ordered[j.gapAt - 1], q = j.ordered[j.gapAt];
+      ctx.strokeStyle = COLORS.alert;
+      ctx.lineWidth = 4 * px;
+      ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(q.x, q.y); ctx.stroke();
+    } else if (j.code === 'BLOCKED' && j.blocker) {
+      ringStamp(j.blocker, COLORS.alert, 3.5, 6);
+    }
+    ctx.restore();
+  }
+
+  /** 왼쪽 아래 눈금 막대: 지금 확대 배율에서 도장 몇 개 길이인지 */
+  function drawScaleBar() {
+    const unit = D() * cam.zoom;
+    let n = 1;
+    while (n < 5 && unit * (n + 1) <= 150) n++;
+    const x0 = 14, y0 = VH - 18;
+    ctx.save();
+    for (let i = 0; i < n; i++) {
+      ctx.fillStyle = i % 2 ? rgba(COLORS.paperInk, 0.25) : rgba(COLORS.paperInk, 0.6);
+      ctx.fillRect(x0 + i * unit, y0, unit, 4);
+    }
+    ctx.fillStyle = rgba(COLORS.paperInk, 0.7);
+    ctx.font = `12px ${token('--font-body')}`;
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(`도장 ${n}개`, x0, y0 - 4);
+    ctx.restore();
+  }
+
+  /* ---------------- 터치 입력: 탭(기준점) · 드래그(이동) · 핀치(확대) · 자 조작 ---------------- */
+  const pointers = new Map();
+  let gesture = null;
+  const localPos = (e) => {
+    const r = canvas.getBoundingClientRect();
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
+  };
+  function hitRuler(p) {
+    const r = state.ruler;
+    if (!r) return null;
+    for (const e of rulerEnds(r)) {
+      const s = worldToScreen(e);
+      if (Math.hypot(s.x - p.x, s.y - p.y) <= 28) return 'handle';
+    }
+    const w = screenToWorld(p.x, p.y);
+    const q = projectOnLine(w, r, rulerAngle(r));
+    const half = (CONFIG.RULER_LENGTH * D()) / 2;
+    const halfW = Math.max((CONFIG.RULER_WIDTH * D()) / 2, 22 / cam.zoom);
+    return Math.abs(q.t) <= half && Math.abs(q.d) <= halfW ? 'body' : null;
+  }
+  function onPointerDown(e) {
+    if (!state || anyOverlay()) return;
+    try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* 무시 */ }
+    const p = localPos(e);
+    pointers.set(e.pointerId, p);
+    cam.tween = null;
+    if (pointers.size === 2) {
+      const [a, b] = [...pointers.values()];
+      gesture = { kind: 'pinch', dist: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)), mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 } };
+      return;
+    }
+    if (pointers.size > 2) return;
+    const w = screenToWorld(p.x, p.y);
+    gesture = { kind: 'pending', id: e.pointerId, sx: p.x, sy: p.y, last: p };
+    if (state.phase === 'stamp' && state.anchor) {
+      const s = worldToScreen(state.anchor);
+      if (Math.hypot(s.x - p.x, s.y - p.y) <= 30) {
+        gesture = { kind: 'anchor', id: e.pointerId, off: { x: state.anchor.x - w.x, y: state.anchor.y - w.y } };
+      }
+    } else if (state.phase === 'ruler') {
+      const h = hitRuler(p);
+      if (h === 'handle') gesture = { kind: 'rotate', id: e.pointerId };
+      else if (h === 'body') gesture = { kind: 'moveRuler', id: e.pointerId, off: { x: state.ruler.x - w.x, y: state.ruler.y - w.y } };
+    }
+  }
+  function onPointerMove(e) {
+    if (!pointers.has(e.pointerId)) return;
+    const p = localPos(e);
+    pointers.set(e.pointerId, p);
+    if (!gesture) return;
+    if (gesture.kind === 'pinch') {
+      if (pointers.size < 2) return;
+      const [a, b] = [...pointers.values()];
+      const dist = Math.max(1, Math.hypot(a.x - b.x, a.y - b.y));
+      const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      cam.x -= (mid.x - gesture.mid.x) / cam.zoom;
+      cam.y -= (mid.y - gesture.mid.y) / cam.zoom;
+      zoomAt(mid.x, mid.y, dist / gesture.dist);
+      gesture.dist = dist;
+      gesture.mid = mid;
+      requestRender();
+      return;
+    }
+    if (gesture.id !== e.pointerId) return;
+    const w = screenToWorld(p.x, p.y);
+    switch (gesture.kind) {
+      case 'pending':
+        if (Math.hypot(p.x - gesture.sx, p.y - gesture.sy) <= TAP_SLOP) break;
+        gesture.kind = 'pan';
+        gesture.last = { x: gesture.sx, y: gesture.sy };
+        // falls through
+      case 'pan':
+        cam.x -= (p.x - gesture.last.x) / cam.zoom;
+        cam.y -= (p.y - gesture.last.y) / cam.zoom;
+        gesture.last = p;
+        requestRender();
+        break;
+      case 'anchor':
+        state.anchor = { x: w.x + gesture.off.x, y: w.y + gesture.off.y };
+        requestRender();
+        break;
+      case 'moveRuler':
+        state.ruler.x = w.x + gesture.off.x;
+        state.ruler.y = w.y + gesture.off.y;
+        syncRulerUI();
+        requestRender();
+        break;
+      case 'rotate':
+        setRulerDeg((-Math.atan2(w.y - state.ruler.y, w.x - state.ruler.x) * 180) / Math.PI);
+        break;
+      default: break;
+    }
+  }
+  function onPointerUp(e) {
+    const p = pointers.get(e.pointerId);
+    pointers.delete(e.pointerId);
+    if (!gesture) return;
+    if (gesture.kind === 'pinch') {
+      if (pointers.size === 1) {
+        const [[id, q]] = [...pointers.entries()];
+        gesture = { kind: 'pan', id, last: q };
+      } else if (pointers.size === 0) gesture = null;
+      return;
+    }
+    if (gesture.id !== e.pointerId) return;
+    if (gesture.kind === 'pending' && e.type === 'pointerup' && p) onTap(p);
+    gesture = null;
+  }
+  function onTap(p) {
+    if (state.phase !== 'stamp') return;
+    state.anchor = screenToWorld(p.x, p.y);
+    Sound.tick();
+    buzz(6);
+    syncUI();
+    requestRender();
+  }
+  canvas.addEventListener('pointerdown', onPointerDown);
+  canvas.addEventListener('pointermove', onPointerMove);
+  canvas.addEventListener('pointerup', onPointerUp);
+  canvas.addEventListener('pointercancel', onPointerUp);
+  canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+  canvas.addEventListener('wheel', (e) => {
+    if (!state || anyOverlay()) return;
+    e.preventDefault();
+    const p = localPos(e);
+    cam.tween = null;
+    zoomAt(p.x, p.y, Math.exp(-e.deltaY * 0.0015));
+    requestRender();
+  }, { passive: false });
+  document.addEventListener('gesturestart', (e) => e.preventDefault());
+
+  /* ---------------- 겹쳐 뜨는 화면 관리 ---------------- */
+  const overlayStack = [];
+  function openOverlay(id) {
+    el[id].hidden = false;
+    if (!overlayStack.includes(id)) overlayStack.push(id);
+    pointers.clear();
+    gesture = null;
+  }
+  function closeOverlay(id) {
+    el[id].hidden = true;
+    const i = overlayStack.indexOf(id);
+    if (i >= 0) overlayStack.splice(i, 1);
+  }
+  function closeAll() {
+    if (!el.dialog.hidden) closeDialog(false);
+    [...overlayStack].forEach(closeOverlay);
+  }
+  const anyOverlay = () => overlayStack.length > 0;
+
+  let dialogResolve = null;
+  function confirmDialog({ title, body, ok = '확인', cancel = '그만두기' }) {
+    el.dlgTitle.textContent = title;
+    el.dlgBody.innerHTML = body;
+    el.dlgOk.textContent = ok;
+    el.dlgCancel.textContent = cancel;
+    openOverlay('dialog');
+    el.dlgOk.focus();
+    return new Promise((resolve) => { dialogResolve = resolve; });
+  }
+  function closeDialog(result) {
+    closeOverlay('dialog');
+    if (dialogResolve) { const r = dialogResolve; dialogResolve = null; r(result); }
+  }
+  el.dlgOk.addEventListener('click', () => closeDialog(true));
+  el.dlgCancel.addEventListener('click', () => closeDialog(false));
+
+  let toastTimer = 0;
+  function toast(msg, kind = '') {
+    el.toast.textContent = msg;
+    el.toast.className = kind;
+    el.toast.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { el.toast.hidden = true; }, 2200);
+  }
+
+  /* ---------------- 조작판 동기화 ---------------- */
+  function setFill(input) {
+    const min = parseFloat(input.min), max = parseFloat(input.max), v = parseFloat(input.value);
+    input.style.setProperty('--fill', `${((v - min) / (max - min)) * 100}%`);
+  }
+  function syncRulerUI() {
+    if (!state || !state.ruler) return;
+    const deg = state.ruler.deg;
+    el.angleRange.value = String(Math.round(deg * 2) / 2);
+    el.angleValue.textContent = `${Math.round(deg)}°`;
+    setFill(el.angleRange);
+    const n = rulerCandidates(rulerForJudge(state.ruler), state.stamps, state.current, CONFIG).length;
+    el.rulerInfo.textContent = `허용 띠 안 내 도장 ${n} / ${CONFIG.WIN_COUNT}`;
+  }
+  function syncUI() {
+    if (!state) return;
+    const P = cur(), me = PLAYERS[P.id], ph = state.phase;
+    document.body.dataset.player = me.key;
+    el.whoSeal.src = SEAL_URL[P.id];
+    el.whoName.textContent = me.name;
+    el.moveNo.textContent = `${state.move}수`;
+    el.myCount.textContent = String(countStamps(P.id));
+
+    const revealed = isRevealed();
+    el.modePill.textContent = revealed ? '판 공개 · 두 사람 모두 보세요' : '판 가림 · 내 기준점만 보여요';
+    el.modePill.classList.toggle('open', revealed);
+
+    el.paneStamp.hidden = !(ph === 'stamp' || ph === 'animating' || ph === 'handoff');
+    el.paneRuler.hidden = !(ph === 'ruler' || ph === 'judging');
+    el.paneResult.hidden = ph !== 'result';
+    el.paneOver.hidden = ph !== 'over';
+    el.tabs.hidden = ph === 'over';
+
+    const stampSide = ph === 'stamp' || ph === 'animating' || ph === 'handoff';
+    el.tabStamp.setAttribute('aria-selected', String(stampSide));
+    el.tabRuler.setAttribute('aria-selected', String(!stampSide && ph !== 'over'));
+    el.tabStamp.disabled = ph !== 'stamp';
+    const blockedLeft = rulerBlockedLeft(P);
+    el.tabRuler.disabled = ph !== 'stamp' || blockedLeft > 0;
+    el.rulerNote.hidden = blockedLeft === 0 || ph === 'over';
+    el.rulerNote.textContent = blockedLeft ? `금지 · ${blockedLeft}차례 남음` : '';
+
+    // 팔 조작
+    const busy = ph !== 'stamp';
+    el.armRange.min = String(CONFIG.ARM_MIN_LENGTH);
+    el.armRange.max = String(CONFIG.ARM_MAX_LENGTH);
+    el.armRange.step = String(CONFIG.ARM_STEP);
+    P.armLength = clamp(P.armLength, CONFIG.ARM_MIN_LENGTH, CONFIG.ARM_MAX_LENGTH);
+    el.armRange.value = String(P.armLength);
+    setFill(el.armRange);
+    el.armValue.textContent = P.armLength.toFixed(1);
+    const up = P.armLength * CONFIG.ARM_SPLIT, side = P.armLength - up;
+    el.armDetail.textContent = `↑ ${up.toFixed(2)} 뒤 ${P.dir === 'left' ? '←' : '→'} ${side.toFixed(2)}`;
+    el.dirLeft.setAttribute('aria-pressed', String(P.dir === 'left'));
+    el.dirRight.setAttribute('aria-pressed', String(P.dir === 'right'));
+    [el.armRange, el.armMinus, el.armPlus, el.dirLeft, el.dirRight].forEach((n) => { n.disabled = busy; });
+    el.btnPlace.disabled = busy || !state.anchor;
+    el.hint.textContent = ph === 'animating'
+      ? '팔을 뻗는 중…'
+      : state.anchor
+        ? '기준점을 끌어 옮길 수 있어요. 준비되면 [놓기].'
+        : '판을 눌러 팔 기준점(어깨)을 정하세요. 두 손가락으로 확대·이동.';
+
+    // 자 조작
+    const rulerBusy = ph !== 'ruler';
+    [el.angleRange, el.angleMinus, el.anglePlus, el.btnJudge, el.btnFit].forEach((n) => { n.disabled = rulerBusy; });
+    el.btnJudge.textContent = ph === 'judging' ? '판정 중…' : '판정하기';
+    syncRulerUI();
+    requestRender();
+  }
+
+  /** 누르고 있으면 반복되는 ± 버튼 */
+  function holdRepeat(btn, fn) {
+    let timer = 0, interval = 0;
+    const stop = () => { clearTimeout(timer); clearInterval(interval); timer = interval = 0; };
+    btn.addEventListener('pointerdown', (e) => {
+      if (btn.disabled) return;
+      e.preventDefault();
+      fn();
+      stop();
+      timer = setTimeout(() => { interval = setInterval(() => (btn.disabled ? stop() : fn()), 70); }, 380);
+    });
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach((t) => btn.addEventListener(t, stop));
+    btn.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fn(); } });
+  }
+  function nudgeArm(delta) {
+    if (!state || state.phase !== 'stamp') return;
+    const P = cur();
+    P.armLength = Math.round(clamp(P.armLength + delta, CONFIG.ARM_MIN_LENGTH, CONFIG.ARM_MAX_LENGTH) * 10) / 10;
+    syncUI();
+  }
+  el.armRange.addEventListener('input', () => {
+    if (!state || state.phase !== 'stamp') return;
+    cur().armLength = parseFloat(el.armRange.value);
+    syncUI();
+  });
+  holdRepeat(el.armMinus, () => nudgeArm(-CONFIG.ARM_STEP));
+  holdRepeat(el.armPlus, () => nudgeArm(CONFIG.ARM_STEP));
+  function setDir(dir) {
+    if (!state || state.phase !== 'stamp') return;
+    cur().dir = dir;
+    Sound.tick();
+    syncUI();
+  }
+  el.dirLeft.addEventListener('click', () => setDir('left'));
+  el.dirRight.addEventListener('click', () => setDir('right'));
+  el.btnPlace.addEventListener('click', placeStamp);
+  el.tabRuler.addEventListener('click', askRuler);
+  el.angleRange.addEventListener('input', () => setRulerDeg(parseFloat(el.angleRange.value)));
+  holdRepeat(el.angleMinus, () => state && state.ruler && setRulerDeg(state.ruler.deg - 0.5));
+  holdRepeat(el.anglePlus, () => state && state.ruler && setRulerDeg(state.ruler.deg + 0.5));
+  el.btnJudge.addEventListener('click', runJudge);
+  el.btnFit.addEventListener('click', () => state && fitView(state.stamps));
+  el.btnPass.addEventListener('click', () => { if (state && state.phase === 'result') endTurn('자 확인 실패'); });
+  el.btnAgain.addEventListener('click', () => { Sound.unlock(); newGame(); });
+  el.btnToMenu.addEventListener('click', showMenu);
+  el.btnReady.addEventListener('click', onReady);
+  el.btnCenter.addEventListener('click', () => {
+    if (!state) return;
+    if (isRevealed()) fitView(state.stamps);
+    else tweenCam(0, 0, defaultZoom());
+  });
+
+  /* ---------------- 메뉴 · 일시 정지 · 게임 방법 · 설정 ---------------- */
+  function menuSpec() {
+    el.menuSpec.textContent = `도장 지름 = 바둑돌의 3/4 · 허용 오차 ±${Math.round(CONFIG.LINE_TOLERANCE * 100)}% · 팔 최대 도장 ${CONFIG.ARM_MAX_LENGTH}개`;
+  }
+  function showMenu() {
+    closeAll();
+    el.btnResume.hidden = !state || state.phase === 'over';
+    menuSpec();
+    openOverlay('menu');
+  }
+  el.btnNew.addEventListener('click', () => { Sound.unlock(); newGame(); });
+  el.btnResume.addEventListener('click', () => { Sound.unlock(); closeOverlay('menu'); if (state && state.phase === 'handoff') openOverlay('handoff'); syncUI(); });
+  el.btnPause.addEventListener('click', () => { if (state) openOverlay('pause'); });
+  el.btnResumeGame.addEventListener('click', () => closeOverlay('pause'));
+  el.btnPauseMenu.addEventListener('click', showMenu);
+  el.btnPauseNew.addEventListener('click', async () => {
+    const ok = await confirmDialog({ title: '새 대국을 시작할까요?', body: '<p>지금 판의 도장은 모두 사라집니다.</p>', ok: '새로 시작' });
+    if (ok) newGame();
+  });
+
+  function renderHowto() {
+    const W = CONFIG.WIN_COUNT;
+    const items = [
+      ['차례마다 한 가지', '[도장 찍기]와 [자 확인] 중 하나를 고릅니다. 어느 쪽이든 차례 하나를 씁니다.'],
+      ['도장 찍기', '판은 가려져 있어요. 판을 눌러 팔 기준점(어깨)을 정합니다. 팔은 화면 위쪽으로 길이의 절반을 뻗고, 팔꿈치에서 직각으로 꺾여 왼쪽이나 오른쪽으로 나머지 절반을 갑니다. 그 끝에 도장이 찍혀요. 손이 살짝 떨려서 계산과 조금 어긋날 수 있어요.'],
+      ['겹치면 막힘', `이미 도장이 있는 자리에 닿으면 '쿵' 하고 찍히지 않습니다. ${CONFIG.OVERLAP_ENDS_TURN ? '차례는 그대로 소모돼요.' : '다시 시도할 수 있어요.'}`],
+      ['자 확인', '판이 두 사람 모두에게 공개됩니다. 자 몸통을 끌어 놓고, 양 끝 손잡이로 돌려 맞춘 뒤 [판정하기].'],
+      ['승리 조건', `내 도장 ${W}개의 중심이 자의 허용 띠(도장 지름의 ±${Math.round(CONFIG.LINE_TOLERANCE * 100)}%) 안에 들고, 최소제곱 직선에 고르게 놓여야 합니다. 이웃 간격은 도장 ${CONFIG.MAX_GAP}개 이하, 그 사이를 상대 도장이 막으면 무효예요.`],
+      ['자 확인 실패', `${penaltyText()}. 공개된 판을 잘 기억해 두세요.`],
+    ];
+    el.howtoBody.innerHTML = `
+      <p class="lede">칸 없는 한지 위에서 두 사람이 번갈아 도장을 찍습니다. 판은 늘 가려져 있고, 누군가 자를 대는 순간에만 드러납니다.</p>
+      <ol class="rules">${items.map(([b, s]) => `<li><b>${b}</b><span>${s}</span></li>`).join('')}</ol>
+      <p class="tip">한지의 섬유 무늬와 판 가운데의 옅은 십자는 기억의 이정표가 됩니다. 왼쪽 아래 눈금 막대로 도장 크기를 가늠하세요.</p>`;
+  }
+  function openHowto() { renderHowto(); openOverlay('howto'); }
+  el.btnHowto.addEventListener('click', openHowto);
+  el.btnPauseHowto.addEventListener('click', openHowto);
+  el.btnHowtoClose.addEventListener('click', () => closeOverlay('howto'));
+  el.btnHowtoDone.addEventListener('click', () => closeOverlay('howto'));
+
+  const SETTINGS_SCHEMA = [
+    { key: 'LINE_TOLERANCE', label: '직선 허용 오차', type: 'range', min: 0.1, max: 0.8, step: 0.05, fmt: (v) => `도장 지름의 ±${Math.round(v * 100)}%`, note: '자의 가운데 선과 도장 중심이 이만큼 떨어져도 인정해요.' },
+    { key: 'ANGLE_TOLERANCE_DEG', label: '자 각도 허용', type: 'range', min: 3, max: 20, step: 1, fmt: (v) => `${v}°` },
+    { key: 'ARM_MAX_LENGTH', label: '팔 최대 길이', type: 'range', min: 4, max: 20, step: 1, fmt: (v) => `도장 ${v}개` },
+    { key: 'ARM_JITTER', label: '손떨림', type: 'range', min: 0, max: 0.2, step: 0.01, fmt: (v) => (v ? `도장 지름의 ${Math.round(v * 100)}%` : '없음') },
+    { key: 'FAIL_PENALTY', label: '자 확인에 실패하면', type: 'select', options: [['none', '차례만 넘어감'], ['skip', '다음 차례 한 번 쉼'], ['cooldown', `${CONFIG_DEFAULTS.COOLDOWN_TURNS}차례 동안 자 확인 금지`]] },
+    { key: 'OVERLAP_ENDS_TURN', label: '도장이 막혀도 차례 소모', type: 'check' },
+    { key: 'SHOW_LANDING_PREVIEW', label: '착지점 미리보기 (쉬운 모드)', type: 'check' },
+    { key: 'SOUND', label: '효과음', type: 'check' },
+    { key: 'VIBRATION', label: '진동', type: 'check' },
+  ];
+  function buildSettings() {
+    el.settingsList.innerHTML = '';
+    for (const f of SETTINGS_SCHEMA) {
+      const id = `set_${f.key}`;
+      const row = document.createElement('div');
+      row.className = 'set-row';
+      if (f.type === 'range') {
+        row.innerHTML = `<div class="set-head"><label for="${id}">${f.label}</label><output id="${id}_out" for="${id}"></output></div>
+          <input id="${id}" type="range" min="${f.min}" max="${f.max}" step="${f.step}">${f.note ? `<p class="set-note">${f.note}</p>` : ''}`;
+      } else if (f.type === 'select') {
+        row.innerHTML = `<div class="set-head"><label for="${id}">${f.label}</label></div>
+          <select id="${id}">${f.options.map(([v, t]) => `<option value="${v}">${t}</option>`).join('')}</select>`;
+      } else {
+        row.innerHTML = `<label class="set-check" for="${id}"><span>${f.label}</span><input id="${id}" type="checkbox"></label>`;
+      }
+      el.settingsList.appendChild(row);
+      const input = row.querySelector(`#${id}`);
+      input.addEventListener(f.type === 'range' ? 'input' : 'change', () => {
+        CONFIG[f.key] = f.type === 'range' ? parseFloat(input.value) : f.type === 'check' ? input.checked : input.value;
+        refreshSettings();
+        saveSettings();
+        if (state) syncUI();
+      });
+    }
+  }
+  function refreshSettings() {
+    for (const f of SETTINGS_SCHEMA) {
+      const input = document.getElementById(`set_${f.key}`);
+      if (f.type === 'range') {
+        input.value = String(CONFIG[f.key]);
+        setFill(input);
+        document.getElementById(`set_${f.key}_out`).textContent = f.fmt(CONFIG[f.key]);
+      } else if (f.type === 'select') input.value = CONFIG[f.key];
+      else input.checked = !!CONFIG[f.key];
+    }
+    menuSpec();
+  }
+  function openSettings() { refreshSettings(); openOverlay('settings'); }
+  el.btnSettings.addEventListener('click', openSettings);
+  el.btnPauseSettings.addEventListener('click', openSettings);
+  el.btnSettingsClose.addEventListener('click', () => closeOverlay('settings'));
+  el.btnSettingsDone.addEventListener('click', () => closeOverlay('settings'));
+  el.btnSettingsReset.addEventListener('click', () => {
+    for (const k of EDITABLE_KEYS) CONFIG[k] = CONFIG_DEFAULTS[k];
+    saveSettings();
+    refreshSettings();
+    if (state) syncUI();
+  });
+  buildSettings();
+
+  /* ---------------- 시작 ---------------- */
+  if (window.ResizeObserver) new ResizeObserver(resize).observe(el.stage);
+  window.addEventListener('resize', resize);
+  resize();
+  menuSpec();
+  overlayStack.push('menu');
+  requestRender();
+
+  // 테스트·디버깅용 창구 (게임 진행에는 쓰지 않음)
+  window.__stampOmok = {
+    CONFIG,
+    get state() { return state; },
+    cam,
+    worldToScreen,
+    screenToWorld,
+    setRuler(x, y, deg) { if (state && state.ruler) { state.ruler.x = x; state.ruler.y = y; setRulerDeg(deg); } },
+  };
+})();
+</script>
+</body>
+</html>
