@@ -26,6 +26,7 @@ export class StageRun {
         abs: settings.abs,
         tcs: settings.tcs,
         counterSteer: settings.counterSteer ? 0.8 : false,
+        easy: settings.easy ? 1 : 0,
       },
     });
     this.notes = generatePaceNotes(road, stage.landmarks);

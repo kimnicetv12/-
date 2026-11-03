@@ -146,3 +146,24 @@ test('auto gearbox does not hunt during a wheelspin launch on snow', () => {
   });
   assert.ok(shifts <= 3, `shifts ${shifts}`);
 });
+
+test('easy mode keeps a handbrake turn from spinning out', () => {
+  const slide = (easy) => {
+    const env = flatEnv('gravel');
+    const car = new Vehicle('gravel', { assists: { autoGear: true, easy } });
+    car.reset(0, 0, 0, env.ground);
+    run(car, env, 1, idle);
+    run(car, env, 6, () => ({ steer: 0, throttle: 1, brake: 0, handbrake: 0 }));
+    let maxBeta = 0, t = 0;
+    while (t < 3) {
+      car.step(DT, { steer: 0.6, throttle: 1, brake: 0, handbrake: t < 0.4 ? 1 : 0 }, env);
+      t += DT;
+      const lv = car.velocity.clone().applyQuaternion(car.quaternion.clone().invert());
+      maxBeta = Math.max(maxBeta, Math.abs(Math.atan2(lv.x, -lv.z)));
+    }
+    return { beta: maxBeta * 180 / Math.PI, speed: car.speed };
+  };
+  const hard = slide(0), easy = slide(1);
+  assert.ok(hard.beta > 60, `without aid ${hard.beta}`);
+  assert.ok(easy.beta < 20 && easy.speed > 20, `easy ${easy.beta} ${easy.speed}`);
+});

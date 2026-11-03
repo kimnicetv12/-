@@ -205,7 +205,7 @@ function bindSettings() {
     return () => { c.checked = !!settings[key]; };
   };
   syncers.push(
-    check('optAutoGear', 'autoGear'), check('optCounter', 'counterSteer'), check('optABS', 'abs'),
+    check('optEasy', 'easy'), check('optAutoGear', 'autoGear'), check('optCounter', 'counterSteer'), check('optABS', 'abs'),
     check('optTCS', 'tcs'), check('optSpeedSteer', 'speedSteer'), check('optVoice', 'voice'),
   );
   $('btnDefaults').addEventListener('click', () => {
@@ -318,9 +318,11 @@ class Game {
     car.assists.abs = settings.abs;
     car.assists.tcs = settings.tcs;
     car.assists.counterSteer = settings.counterSteer ? 0.8 : false;
+    car.assists.easy = settings.easy ? 1 : 0;
     this.run.codriver.voice = settings.voice && typeof speechSynthesis !== 'undefined';
     $('gearBox').hidden = settings.autoGear;
     const a = [];
+    if (settings.easy) a.push('EASY');
     if (settings.autoGear) a.push('AUTO');
     if (settings.abs) a.push('ABS');
     if (settings.tcs) a.push('TCS');

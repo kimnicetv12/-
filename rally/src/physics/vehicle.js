@@ -425,7 +425,7 @@ export class Vehicle {
       const sy = tanA / surf.tanAPeak;
       const sl = Math.hypot(sx, sy);
       const loadRatio = w.Fz / 3500;
-      const mu = surf.mu * clamp(1 - 0.1 * (loadRatio - 1), 0.75, 1.12) * this.gripScale;
+      const mu = surf.mu * clamp(1 - 0.1 * (loadRatio - 1), 0.75, 1.12) * this.gripScale * (1 + 0.2 * (this.assists.easy || 0));
       const Fmax = mu * w.Fz;
       const Fmag = Fmax * slipCurve(sl, surf.fall);
       let Fx = sl > 1e-9 ? (Fmag * sx) / sl : 0;
@@ -494,6 +494,25 @@ export class Vehicle {
     F.addScaledVector(v, -0.5 * RHO * car.cdA * sp);
     const vf = v.dot(fwdBody);
     F.addScaledVector(up, -0.5 * RHO * car.clA * vf * vf);
+
+    // ---- easy-mode driving aid ----------------------------------------------
+    // Steers the body's yaw toward what the front wheels ask for and bleeds
+    // off sideways speed, so the car follows the road instead of spinning.
+    const easy = this.assists.easy || 0;
+    if (easy > 0 && contacts > 0) {
+      const lv = _v3.copy(v).applyQuaternion(_qi.copy(q).invert());
+      const fwdSp = -lv.z;
+      if (fwdSp > 2) {
+        const grip = contacts / 4;
+        let want = (-fwdSp * Math.tan(this.rack * car.maxSteer)) / car.wheelbase;
+        const cap = 9 / Math.max(fwdSp, 1);
+        want = clamp(want, -cap, cap);
+        const yaw = om.dot(up);
+        T.addScaledVector(up, -(yaw - want) * this.I.y * 7 * easy * grip);
+        const side = _v4.set(1, 0, 0).applyQuaternion(q);
+        F.addScaledVector(side, -clamp(lv.x * 3, -5, 5) * this.mass * easy * grip);
+      }
+    }
 
     // ---- integrate --------------------------------------------------------
     v.addScaledVector(F, dt / this.mass);
