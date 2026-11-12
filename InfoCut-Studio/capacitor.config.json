@@ -1,0 +1,7 @@
+{
+  "appId": "studio.infocut.app",
+  "appName": "InfoCut",
+  "webDir": "mobile/www",
+  "android": { "backgroundColor": "#1e1e1e" },
+  "server": { "androidScheme": "https" }
+}
