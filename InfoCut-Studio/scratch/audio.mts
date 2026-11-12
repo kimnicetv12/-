@@ -1,0 +1,20 @@
+import fs from 'node:fs'; import path from 'node:path'; import { execSync } from 'node:child_process';
+import { readProject } from '../server/store';
+import { buildTiming } from '../src/shared/timing';
+import { renderFinal } from '../server/render';
+import { loadSettings } from '../server/store';
+const id = fs.readFileSync('/tmp/pid', 'utf8').trim();
+const p = readProject(id); p.narration.enabled = true;
+const dir = `/tmp/icdata/projects/${id}/audio`; fs.mkdirSync(dir, { recursive: true });
+const info: any = {};
+p.scenes.forEach((s, i) => {
+  const f = path.join(dir, `fake${i}.mp3`); const sec = 1.2 + (i % 3) * 0.5;
+  execSync(`ffmpeg -v error -y -f lavfi -i sine=frequency=${300 + i * 40}:duration=${sec} -ac 2 -ar 48000 ${f}`);
+  const words = s.text.replace(/\s*\/\s*/g, ' ').split(/\s+/).map((w, k, a) => ({ offset: (sec * k) / a.length, text: w }));
+  info[s.id] = { url: `/files/projects/${id}/audio/fake${i}.mp3`, seconds: sec, words };
+});
+const timing = buildTiming(p, info);
+console.log('frames', timing.totalFrames, timing.scenes.map((t) => `${t.frames}:${t.captions.map((c) => c.start + '-' + c.end).join(',')}`).join(' '));
+const url = await renderFinal(loadSettings(), p, timing, () => {});
+console.log(url);
+process.exit(0);

@@ -1,0 +1,40 @@
+{
+  "name": "infocut-studio",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "tsx server/index.ts",
+    "build:ui": "vite build --config ui/vite.config.ts",
+    "build:mobile": "vite build --config ui/vite.config.ts --mode mobile",
+    "dev:ui": "vite --config ui/vite.config.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.6.2",
+    "@capacitor/core": "^8.6.2",
+    "@remotion/bundler": "4.0.543",
+    "@remotion/fonts": "4.0.543",
+    "@remotion/media": "4.0.543",
+    "@remotion/player": "4.0.543",
+    "@remotion/renderer": "4.0.543",
+    "@remotion/web-renderer": "4.0.543",
+    "express": "^5.3.0",
+    "fflate": "^0.8.3",
+    "music-metadata": "^12.4.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "remotion": "4.0.543",
+    "tsx": "^4.23.15"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.6.2",
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.6.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.3.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.8"
+  }
+}
