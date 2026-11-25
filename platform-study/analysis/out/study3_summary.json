@@ -18,6 +18,7 @@
         "base_small_share": 0.9136531365313654,
         "base_reached_end": 0.0,
         "exposure_ratio": 0.5283828198986129,
+        "exposure_ratio_lower_bound": 0.5283828198986129,
         "rec_median_viewers": 114.0,
         "base_median_viewers": 105.5
       },
@@ -37,6 +38,7 @@
         "base_small_share": 0.8894736842105263,
         "base_reached_end": 0.0,
         "exposure_ratio": 0.2914749068595222,
+        "exposure_ratio_lower_bound": 0.2914749068595222,
         "rec_median_viewers": 269.0,
         "base_median_viewers": 41.0
       },
@@ -56,6 +58,7 @@
         "base_small_share": NaN,
         "base_reached_end": NaN,
         "exposure_ratio": NaN,
+        "exposure_ratio_lower_bound": 0.3306629834254144,
         "rec_median_viewers": 972.0,
         "base_median_viewers": NaN
       },
@@ -75,8 +78,49 @@
         "base_small_share": 0.8921644685802947,
         "base_reached_end": 0.0,
         "exposure_ratio": 0.0,
+        "exposure_ratio_lower_bound": 0.0,
         "rec_median_viewers": 901.0,
         "base_median_viewers": 9.0
+      },
+      {
+        "round_id": "20261125T2206-9cfd",
+        "platform": "chzzk",
+        "time_slot": 22,
+        "event": 0,
+        "n_rec": 30,
+        "n_rec_small": 12,
+        "rec_small_share": 0.4,
+        "baseline_round": NaN,
+        "n_base_loaded": 0,
+        "n_base_big": NaN,
+        "total_lives": NaN,
+        "total_source": "",
+        "base_small_share": NaN,
+        "base_reached_end": NaN,
+        "exposure_ratio": NaN,
+        "exposure_ratio_lower_bound": 0.4077524429967427,
+        "rec_median_viewers": 432.5,
+        "base_median_viewers": NaN
+      },
+      {
+        "round_id": "20261125T2206-9cfd",
+        "platform": "soop",
+        "time_slot": 22,
+        "event": 0,
+        "n_rec": 30,
+        "n_rec_small": 5,
+        "rec_small_share": 0.16666666666666666,
+        "baseline_round": "20261125T2206-9cfd",
+        "n_base_loaded": 2556,
+        "n_base_big": 429.0,
+        "total_lives": 4403.0,
+        "total_source": "list totalCount",
+        "base_small_share": 0.9025664319781966,
+        "base_reached_end": 0.0,
+        "exposure_ratio": 0.1846586143264553,
+        "exposure_ratio_lower_bound": 0.1846586143264553,
+        "rec_median_viewers": 1441.0,
+        "base_median_viewers": 18.0
       }
     ],
     "incl_hero": [
@@ -96,6 +140,7 @@
         "base_small_share": 0.9136531365313654,
         "base_reached_end": 0.0,
         "exposure_ratio": 0.5150622446070512,
+        "exposure_ratio_lower_bound": 0.5150622446070512,
         "rec_median_viewers": 124.5,
         "base_median_viewers": 105.5
       },
@@ -115,6 +160,7 @@
         "base_small_share": 0.8894736842105263,
         "base_reached_end": 0.0,
         "exposure_ratio": 0.2914749068595222,
+        "exposure_ratio_lower_bound": 0.2914749068595222,
         "rec_median_viewers": 269.0,
         "base_median_viewers": 41.0
       },
@@ -134,6 +180,7 @@
         "base_small_share": NaN,
         "base_reached_end": NaN,
         "exposure_ratio": NaN,
+        "exposure_ratio_lower_bound": 0.28056253139126064,
         "rec_median_viewers": 829.0,
         "base_median_viewers": NaN
       },
@@ -153,8 +200,49 @@
         "base_small_share": 0.8921644685802947,
         "base_reached_end": 0.0,
         "exposure_ratio": 0.0,
+        "exposure_ratio_lower_bound": 0.0,
         "rec_median_viewers": 901.0,
         "base_median_viewers": 9.0
+      },
+      {
+        "round_id": "20261125T2206-9cfd",
+        "platform": "chzzk",
+        "time_slot": 22,
+        "event": 0,
+        "n_rec": 35,
+        "n_rec_small": 12,
+        "rec_small_share": 0.34285714285714286,
+        "baseline_round": NaN,
+        "n_base_loaded": 0,
+        "n_base_big": NaN,
+        "total_lives": NaN,
+        "total_source": "",
+        "base_small_share": NaN,
+        "base_reached_end": NaN,
+        "exposure_ratio": NaN,
+        "exposure_ratio_lower_bound": 0.349502093997208,
+        "rec_median_viewers": 372.0,
+        "base_median_viewers": NaN
+      },
+      {
+        "round_id": "20261125T2206-9cfd",
+        "platform": "soop",
+        "time_slot": 22,
+        "event": 0,
+        "n_rec": 30,
+        "n_rec_small": 5,
+        "rec_small_share": 0.16666666666666666,
+        "baseline_round": "20261125T2206-9cfd",
+        "n_base_loaded": 2556,
+        "n_base_big": 429.0,
+        "total_lives": 4403.0,
+        "total_source": "list totalCount",
+        "base_small_share": 0.9025664319781966,
+        "base_reached_end": 0.0,
+        "exposure_ratio": 0.1846586143264553,
+        "exposure_ratio_lower_bound": 0.1846586143264553,
+        "rec_median_viewers": 1441.0,
+        "base_median_viewers": 18.0
       }
     ]
   },
@@ -167,10 +255,10 @@
         "n_rounds": 1
       },
       "soop": {
-        "ratio": 0.1403202999488932,
+        "ratio": 0.1559510975944528,
         "ci_lo": NaN,
         "ci_hi": NaN,
-        "n_rounds": 2
+        "n_rounds": 3
       }
     },
     "incl_hero": {
@@ -181,10 +269,10 @@
         "n_rounds": 1
       },
       "soop": {
-        "ratio": 0.1403202999488932,
+        "ratio": 0.1559510975944528,
         "ci_lo": NaN,
         "ci_hi": NaN,
-        "n_rounds": 2
+        "n_rounds": 3
       }
     }
   },
@@ -202,6 +290,12 @@
           "ci_lo": NaN,
           "ci_hi": NaN,
           "n_rounds": 0
+        },
+        "22": {
+          "ratio": NaN,
+          "ci_lo": NaN,
+          "ci_hi": NaN,
+          "n_rounds": 0
         }
       },
       "soop": {
@@ -213,6 +307,12 @@
         },
         "18": {
           "ratio": 0.0,
+          "ci_lo": NaN,
+          "ci_hi": NaN,
+          "n_rounds": 1
+        },
+        "22": {
+          "ratio": 0.1846586143264553,
           "ci_lo": NaN,
           "ci_hi": NaN,
           "n_rounds": 1
@@ -232,6 +332,12 @@
           "ci_lo": NaN,
           "ci_hi": NaN,
           "n_rounds": 0
+        },
+        "22": {
+          "ratio": NaN,
+          "ci_lo": NaN,
+          "ci_hi": NaN,
+          "n_rounds": 0
         }
       },
       "soop": {
@@ -246,11 +352,17 @@
           "ci_lo": NaN,
           "ci_hi": NaN,
           "n_rounds": 1
+        },
+        "22": {
+          "ratio": 0.1846586143264553,
+          "ci_lo": NaN,
+          "ci_hi": NaN,
+          "n_rounds": 1
         }
       }
     }
   },
-  "n_home_rounds": 2,
-  "n_baselines": 4,
+  "n_home_rounds": 3,
+  "n_baselines": 5,
   "ready": false
 }

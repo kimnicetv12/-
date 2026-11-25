@@ -100,10 +100,37 @@ def per_round(runs, home, base, meta, small_max: int, include_hero: bool) -> pd.
             "total_lives": total, "total_source": tsrc, "base_small_share": bshare,
             "base_reached_end": int(run_b["reached_end"].iloc[0]) if len(run_b) else None,
             "exposure_ratio": rec_share / bshare if bshare and bshare > 0 else np.nan,
+            # 정확한 비율이 있으면 그 값, 없으면(치지직 저녁의 120개 상한) 하한
+            "exposure_ratio_lower_bound": (rec_share / bshare if bshare and bshare > 0
+                                           else ratio_lower_bound(rec_share, rid, pf, meta, base, small_max)),
             "rec_median_viewers": float(g.viewers.median()),
             "base_median_viewers": float(b.viewers.median()) if len(b) else np.nan,
         })
     return pd.DataFrame(rows)
+
+
+def ratio_lower_bound(rec_share, rid, pf, meta, base, small_max):
+    """기준선이 50명 경계를 못 넘은 회차(치지직 저녁의 120개 상한)의 노출 비율 하한.
+
+    목록에서 센 50명 이상 방송 수 n_loaded는 실제 50명 이상 방송 수의 하한이므로
+    전체 중 소규모 방송 비율 ≤ 1 - n_loaded / 전체 방송 수, 따라서 노출 비율 ≥ 추천 비율 ÷ 그 값.
+    같은 시각(±3시간 안 가장 가까운) 기준선 메타가 있을 때만 계산한다.
+    """
+    if not len(meta):
+        return np.nan
+    t0 = datetime.strptime(rid[:13], "%Y%m%dT%H%M")
+    cand = meta[(meta.platform == pf) & meta.total_lives.notna()].copy()
+    if cand.empty:
+        return np.nan
+    cand["gap"] = cand.round_id.map(lambda r: abs((datetime.strptime(r[:13], "%Y%m%dT%H%M") - t0).total_seconds()))
+    cand = cand[cand.gap <= 3 * 3600].sort_values("gap")
+    if cand.empty:
+        return np.nan
+    m = cand.iloc[0]
+    b = base[(base.round_id == m.round_id) & (base.platform == pf)]
+    n_big_loaded = int((b.viewers > small_max).sum())
+    upper = 1 - n_big_loaded / float(m.total_lives)
+    return rec_share / upper if upper > 0 else np.nan
 
 
 def ratio_ci(df: pd.DataFrame, reps: int, seed: int):

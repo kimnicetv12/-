@@ -237,3 +237,8 @@
 2026-11-25 09:19:58,073 INFO [20261125T1805-7315] baseline chzzk: loaded 78 (min 370), total 2793 (category openLiveCount sum (354 categories)), end=False, sorted=1
 2026-11-25 09:44:19,967 WARNING baseline soop: 새 방송이 3번 연속 늘지 않아 멈춤 (n=2278)
 2026-11-25 09:44:20,317 INFO [20261125T1805-7315] baseline soop: loaded 2278 (min 0), total 2578 (list totalCount), end=False, sorted=0
+2026-11-25 13:07:58,850 INFO [20261125T2206-9cfd] home chzzk: 38 cards
+2026-11-25 13:09:49,636 INFO [20261125T2206-9cfd] home soop: 36 cards
+2026-11-25 13:14:27,965 WARNING baseline chzzk: 새 방송이 3번 연속 늘지 않아 멈춤 (n=119)
+2026-11-25 13:28:04,972 INFO [20261125T2206-9cfd] baseline chzzk: loaded 119 (min 372), total 6259 (category openLiveCount sum (605 categories)), end=False, sorted=1
+2026-11-25 13:54:18,639 INFO [20261125T2206-9cfd] baseline soop: loaded 2556 (min 6), total 4403 (list totalCount), end=False, sorted=0

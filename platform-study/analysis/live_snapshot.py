@@ -35,6 +35,30 @@ def load():
     return runs, meta, base
 
 
+def fill_tail_estimate(meta: pd.DataFrame, base: pd.DataFrame) -> pd.DataFrame:
+    """full 모드에서 시간 제한으로 꼬리 일부를 못 받은 회차의 전체 시청자를 추정한다.
+
+    시청자순 목록이라 못 받은 방송은 모두 마지막으로 받은 방송의 동접(min)보다 작다.
+    그래서 전체 시청자 = 받은 합 + 못 받은 수 × 구간 [0, min-1] 의 가운데값으로 추정하고,
+    오차 한계(못 받은 수 × (min-1) / 2)와 함께 기록한다. 50명 경계 아래까지 받았을 때만 쓴다.
+    """
+    meta = meta.copy()
+    meta["total_viewers_estimated"] = 0
+    meta["total_viewers_margin"] = 0.0
+    for i, m in meta.iterrows():
+        if pd.notna(m.total_viewers) or m["mode"] != "full" or m.crossed_threshold != 1 or pd.isna(m.total_lives):
+            continue
+        b = base[(base.round_id == m.round_id) & (base.platform == m.platform)].viewers.dropna()
+        if b.empty:
+            continue
+        missing = max(0, int(m.total_lives) - len(b))
+        lo = int(b.min())
+        meta.loc[i, "total_viewers"] = b.sum() + missing * (lo - 1) / 2
+        meta.loc[i, "total_viewers_estimated"] = 1
+        meta.loc[i, "total_viewers_margin"] = missing * (lo - 1) / 2
+    return meta
+
+
 def usable(meta: pd.DataFrame) -> pd.DataFrame:
     """전체 방송 수·전체 시청자가 있는 회차. 50명 경계를 못 넘은 회차는 상위권 몫만 계산한다."""
     return meta.dropna(subset=["total_lives", "total_viewers"])
@@ -42,16 +66,17 @@ def usable(meta: pd.DataFrame) -> pd.DataFrame:
 
 def snapshot_stats(b: pd.DataFrame, m: pd.Series, small_max: int) -> dict:
     v = b.viewers.dropna().astype(int).sort_values(ascending=False).to_numpy()
-    total_v, total_n = int(m.total_viewers), int(m.total_lives)
+    total_v, total_n = float(m.total_viewers), int(m.total_lives)
     big = v[v > small_max]
     k1 = max(1, math.ceil(total_n * 0.01))
     # full: 목록을 동접 0명 꼬리까지 받았다. 수집하는 10여 분 사이 새로 켠 방송은 빠질 수 있다(빠진 수는 기록)
-    full = bool(m["mode"] == "full" and len(v) and v.min() == 0)
+    full = bool(m["mode"] == "full" and len(v) and (v.min() == 0 or m.get("total_viewers_estimated", 0) == 1))
     complete_big = bool(full or m.crossed_threshold == 1)  # 50명 이상 방송을 다 셌는지
     off = b[(b.official == 1) & (b.viewers > small_max)].viewers.sum()
     out = {
         "round_id": m.round_id, "platform": m.platform, "total_lives": total_n, "total_viewers": total_v,
-        "full_list": int(full),
+        "full_list": int(full), "viewers_estimated": int(m.get("total_viewers_estimated", 0) or 0),
+        "viewers_margin_share": float(m.get("total_viewers_margin", 0) or 0) / total_v,
         "top1_share": v[0] / total_v if len(v) else np.nan,
         "top10_share": v[:10].sum() / total_v,
         "top1pct_n": k1, "top1pct_share": v[:k1].sum() / total_v,
@@ -112,6 +137,7 @@ def main() -> int:
     runs, meta, base = load()
     OUT.mkdir(parents=True, exist_ok=True)
     rows = []
+    meta = fill_tail_estimate(meta, base)
     for _, m in usable(meta).iterrows():
         b = base[(base.round_id == m.round_id) & (base.platform == m.platform)]
         if len(b):

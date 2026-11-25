@@ -250,11 +250,19 @@ def study3(v: dict) -> None:
         for r in s["rounds"].get(variant, []):
             rows.append([label, r["round_id"], PF[r["platform"]], r["n_rec"], r["n_rec_small"], pct(r["rec_small_share"]),
                          num(r.get("n_base_big")), num(r.get("total_lives")), pct(r["base_small_share"]),
-                         "—" if pd.isna(r["exposure_ratio"]) else f"{r['exposure_ratio']:.2f}",
+                         ("—" if pd.isna(r["exposure_ratio"]) else f"{r['exposure_ratio']:.2f}")
+                         + ("" if not pd.isna(r["exposure_ratio"]) or pd.isna(r.get("exposure_ratio_lower_bound"))
+                            else f" (≥ {r['exposure_ratio_lower_bound']:.2f})"),
                          num(r["rec_median_viewers"]), r.get("total_source") or ""])
     v["table_s3"] = md_table(["범위", "회차", "플랫폼", "추천 채널", "추천 중 소규모 방송", "추천 소규모 방송 비율", "기준선 50명 이상",
                               "전체 라이브", "전체 소규모 방송 비율", "노출 비율", "추천 동접 중앙값", "전체 수 출처"], rows)
     rounds = pd.DataFrame(s["rounds"].get("main_excl_hero", []))
+    v["s3_n_rounds_total"] = rounds.round_id.nunique() if len(rounds) else 0
+    lb = rounds.dropna(subset=["exposure_ratio_lower_bound"]) if len(rounds) else rounds
+    for pf in ("chzzk", "soop"):
+        x = lb[lb.platform == pf].sort_values("round_id") if len(lb) else lb
+        v[f"s3_lb_list_{pf}"] = ", ".join(f"{t[9:11]}:{t[11:13]} {'≥ ' if pd.isna(e) else ''}{b:.2f}"
+                                          for t, e, b in zip(x.round_id, x.exposure_ratio, x.exposure_ratio_lower_bound)) or "—"
     for pf in ("chzzk", "soop"):
         rr = rounds[rounds.platform == pf] if len(rounds) else rounds
         v[f"s3_rec_share_{pf}"] = pct(rr.rec_small_share.mean()) if len(rr) else "—"
