@@ -1,0 +1,258 @@
+{
+  "min_small_lives": 8,
+  "figure": "paper/figures/fig6_category_small.png",
+  "platforms": {
+    "chzzk": {
+      "rounds": [
+        "20261125T1152-fdd3"
+      ],
+      "n_categories": 32,
+      "median_viewers_per_small_live": 7.181818181818182,
+      "top": [
+        {
+          "category": "도깨비의세계",
+          "lives": 19,
+          "small_lives": 11.0,
+          "viewers_per_small_live": 22.454545454545453,
+          "small_share_of_viewers": 0.05893581484132665,
+          "top_live_share": 0.4101646385110952
+        },
+        {
+          "category": "검은사막",
+          "lives": 9,
+          "small_lives": 9.0,
+          "viewers_per_small_live": 16.444444444444443,
+          "small_share_of_viewers": 1.0,
+          "top_live_share": NaN
+        },
+        {
+          "category": "드라마",
+          "lives": 9,
+          "small_lives": 8.0,
+          "viewers_per_small_live": 14.125,
+          "small_share_of_viewers": 0.44313725490196076,
+          "top_live_share": 0.5568627450980392
+        },
+        {
+          "category": "명조:워더링 웨이브",
+          "lives": 8,
+          "small_lives": 8.0,
+          "viewers_per_small_live": 13.625,
+          "small_share_of_viewers": 1.0,
+          "top_live_share": NaN
+        },
+        {
+          "category": "월드 오브 워크래프트: 한밤",
+          "lives": 11,
+          "small_lives": 11.0,
+          "viewers_per_small_live": 11.181818181818182,
+          "small_share_of_viewers": 1.0,
+          "top_live_share": NaN
+        },
+        {
+          "category": "천하제일상거상",
+          "lives": 9,
+          "small_lives": 8.0,
+          "viewers_per_small_live": 11.0,
+          "small_share_of_viewers": 0.4835164835164835,
+          "top_live_share": 0.5164835164835165
+        },
+        {
+          "category": "명일방주: 엔드필드",
+          "lives": 19,
+          "small_lives": 14.0,
+          "viewers_per_small_live": 10.785714285714286,
+          "small_share_of_viewers": 0.12417763157894737,
+          "top_live_share": 0.34868421052631576
+        },
+        {
+          "category": "패스 오브 엑자일",
+          "lives": 10,
+          "small_lives": 9.0,
+          "viewers_per_small_live": 9.777777777777779,
+          "small_share_of_viewers": 0.1282798833819242,
+          "top_live_share": 0.8717201166180758
+        },
+        {
+          "category": "철권 8",
+          "lives": 9,
+          "small_lives": 9.0,
+          "viewers_per_small_live": 9.333333333333334,
+          "small_share_of_viewers": 1.0,
+          "top_live_share": NaN
+        },
+        {
+          "category": "talk",
+          "lives": 144,
+          "small_lives": 120.0,
+          "viewers_per_small_live": 9.183333333333334,
+          "small_share_of_viewers": 0.11086519114688129,
+          "top_live_share": 0.20452716297786722
+        }
+      ],
+      "crowded": [
+        {
+          "category": "talk",
+          "lives": 144,
+          "small_lives": 120.0,
+          "viewers_per_small_live": 9.183333333333334,
+          "small_share_of_viewers": 0.11086519114688129
+        },
+        {
+          "category": "리그 오브 레전드",
+          "lives": 114,
+          "small_lives": 107.0,
+          "viewers_per_small_live": 5.757009345794392,
+          "small_share_of_viewers": 0.12414349052801289
+        },
+        {
+          "category": "월드 오브 워크래프트: 포에버",
+          "lives": 75,
+          "small_lives": 67.0,
+          "viewers_per_small_live": 6.268656716417911,
+          "small_share_of_viewers": 0.24461269656377402
+        },
+        {
+          "category": "로스트아크",
+          "lives": 62,
+          "small_lives": 56.0,
+          "viewers_per_small_live": 8.232142857142858,
+          "small_share_of_viewers": 0.09987001733102253
+        },
+        {
+          "category": "메이플스토리",
+          "lives": 52,
+          "small_lives": 49.0,
+          "viewers_per_small_live": 7.6938775510204085,
+          "small_share_of_viewers": 0.5817901234567902
+        }
+      ]
+    },
+    "soop": {
+      "rounds": [
+        "20261125T1337-aae8"
+      ],
+      "n_categories": 29,
+      "median_viewers_per_small_live": 9.627906976744185,
+      "top": [
+        {
+          "category": "아마 야구",
+          "lives": 11,
+          "small_lives": 10.0,
+          "viewers_per_small_live": 23.5,
+          "small_share_of_viewers": 0.818815331010453,
+          "top_live_share": 0.18118466898954705
+        },
+        {
+          "category": "스타크래프트",
+          "lives": 42,
+          "small_lives": 32.0,
+          "viewers_per_small_live": 18.125,
+          "small_share_of_viewers": 0.20124913254684246,
+          "top_live_share": 0.5808466342817488
+        },
+        {
+          "category": "낚시/아웃도어",
+          "lives": 12,
+          "small_lives": 9.0,
+          "viewers_per_small_live": 17.333333333333332,
+          "small_share_of_viewers": 0.4394366197183099,
+          "top_live_share": 0.23943661971830985
+        },
+        {
+          "category": "버추얼",
+          "lives": 63,
+          "small_lives": 49.0,
+          "viewers_per_small_live": 14.775510204081632,
+          "small_share_of_viewers": 0.11738002594033722,
+          "top_live_share": 0.187094682230869
+        },
+        {
+          "category": "먹방/쿡방",
+          "lives": 16,
+          "small_lives": 12.0,
+          "viewers_per_small_live": 13.416666666666666,
+          "small_share_of_viewers": 0.03861837371072199,
+          "top_live_share": 0.5195490525305829
+        },
+        {
+          "category": "운세",
+          "lives": 8,
+          "small_lives": 8.0,
+          "viewers_per_small_live": 13.125,
+          "small_share_of_viewers": 1.0,
+          "top_live_share": 0.4666666666666667
+        },
+        {
+          "category": "더빙/라디오",
+          "lives": 22,
+          "small_lives": 22.0,
+          "viewers_per_small_live": 12.772727272727273,
+          "small_share_of_viewers": 1.0,
+          "top_live_share": 0.12455516014234876
+        },
+        {
+          "category": "토크/캠방",
+          "lives": 120,
+          "small_lives": 88.0,
+          "viewers_per_small_live": 12.772727272727273,
+          "small_share_of_viewers": 0.10258282376562927,
+          "top_live_share": 0.16729031669252534
+        },
+        {
+          "category": "암호화폐",
+          "lives": 13,
+          "small_lives": 12.0,
+          "viewers_per_small_live": 12.166666666666666,
+          "small_share_of_viewers": 0.6576576576576577,
+          "top_live_share": 0.34234234234234234
+        },
+        {
+          "category": "PUBG: 배틀그라운드",
+          "lives": 118,
+          "small_lives": 113.0,
+          "viewers_per_small_live": 11.663716814159292,
+          "small_share_of_viewers": 0.7849910661107802,
+          "top_live_share": 0.06908874329958309
+        }
+      ],
+      "crowded": [
+        {
+          "category": "리그 오브 레전드",
+          "lives": 252,
+          "small_lives": 222.0,
+          "viewers_per_small_live": 7.702702702702703,
+          "small_share_of_viewers": 0.08286891204264599
+        },
+        {
+          "category": "서든어택",
+          "lives": 121,
+          "small_lives": 118.0,
+          "viewers_per_small_live": 10.567796610169491,
+          "small_share_of_viewers": 0.818241469816273
+        },
+        {
+          "category": "PUBG: 배틀그라운드",
+          "lives": 118,
+          "small_lives": 113.0,
+          "viewers_per_small_live": 11.663716814159292,
+          "small_share_of_viewers": 0.7849910661107802
+        },
+        {
+          "category": "토크/캠방",
+          "lives": 120,
+          "small_lives": 88.0,
+          "viewers_per_small_live": 12.772727272727273,
+          "small_share_of_viewers": 0.10258282376562927
+        },
+        {
+          "category": "취미",
+          "lives": 74,
+          "small_lives": 74.0,
+          "viewers_per_small_live": 3.108108108108108,
+          "small_share_of_viewers": 1.0
+        }
+      ]
+    }
+  }
+}

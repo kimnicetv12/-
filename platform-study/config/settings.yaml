@@ -28,8 +28,8 @@ paths:
 streamrate:
   url: "https://stream-rate.com/viewership/"
 
-# 하꼬 정의 (RQ3)
-hakko_max_viewers: 49        # 동접 50명 미만
+# 소규모 방송 정의 (RQ3)
+small_max_viewers: 49        # 동접 50명 미만
 
 analysis:
   bootstrap_reps: 5000

@@ -167,8 +167,8 @@ def study5(v: dict) -> None:
         v[f"s5_n_{pf}"] = len(d)
         v[f"s5_top10_{pf}"] = pct(d.top10_share.mean()) if len(d) else "—"
         v[f"s5_top1pct_{pf}"] = pct(d.top1pct_share.mean()) if len(d) else "—"
-        v[f"s5_hakko_live_{pf}"] = pct(dc.hakko_live_share.mean()) if len(dc) else "—"
-        v[f"s5_hakko_viewer_{pf}"] = pct(dc.hakko_viewer_share.mean()) if len(dc) else "—"
+        v[f"s5_small_live_{pf}"] = pct(dc.small_live_share.mean()) if len(dc) else "—"
+        v[f"s5_small_viewer_{pf}"] = pct(dc.small_viewer_share.mean()) if len(dc) else "—"
         v[f"s5_official_{pf}"] = pct(d.official_viewer_share.mean(), 2) if len(d) else "—"
         v[f"s5_lives_{pf}"] = num(d.total_lives.mean()) if len(d) else "—"
         v[f"s5_viewers_{pf}"] = num(d.total_viewers.mean()) if len(d) else "—"
@@ -177,13 +177,42 @@ def study5(v: dict) -> None:
         for r in df.itertuples():
             t = r.round_id
             rows.append([f"{t[4:6]}/{t[6:8]} {t[9:11]}:{t[11:13]}", PF[r.platform], num(r.total_lives), num(r.total_viewers),
-                         pct(r.top10_share), f"{pct(r.top1pct_share)} ({r.top1pct_n}개)", pct(r.hakko_live_share),
-                         pct(r.hakko_viewer_share), pct(r.official_viewer_share, 2),
+                         pct(r.top10_share), f"{pct(r.top1pct_share)} ({r.top1pct_n}개)", pct(r.small_live_share),
+                         pct(r.small_viewer_share), pct(r.official_viewer_share, 2),
                          pct(getattr(r, "partner_viewer_share", float("nan"))) if r.platform == "chzzk" else "—"])
         v["table_s5"] = md_table(["시각(KST)", "플랫폼", "전체 방송", "전체 시청자", "상위 10개 방송 몫", "상위 1% 방송 몫",
-                                  "하꼬 방송 비율", "하꼬의 시청자 몫", "공식 채널 몫", "파트너 몫"], rows)
+                                  "소규모 방송 비율", "소규모 방송의 시청자 몫", "공식 채널 몫", "파트너 몫"], rows)
     else:
         v["table_s5"] = "_전수 스냅샷 없음_"
+
+
+def study5b(v: dict) -> None:
+    p = OUT / "study5b_summary.json"
+    s = json.loads(p.read_text(encoding="utf-8")) if p.exists() else {"platforms": {}}
+    v["s5b_n_threshold"] = s.get("min_small_lives", "—")
+    rows_top, rows_crowd = [], []
+    for pf in ("chzzk", "soop"):
+        d = s["platforms"].get(pf)
+        v[f"s5b_median_{pf}"] = f"{d['median_viewers_per_small_live']:.1f}" if d else "—"
+        v[f"s5b_ncat_{pf}"] = d["n_categories"] if d else 0
+        v[f"s5b_round_{pf}"] = (lambda t: f"{t[4:6]}/{t[6:8]} {t[9:11]}:{t[11:13]}")(d["rounds"][0]) if d else "—"
+        if not d:
+            continue
+        for r in d["top"][:8]:
+            rows_top.append([PF[pf], r["category"], int(r["lives"]), int(r["small_lives"]),
+                             f"{r['viewers_per_small_live']:.1f}", pct(r["small_share_of_viewers"], 0),
+                             pct(r["top_live_share"], 0)])
+        for r in d["crowded"]:
+            rows_crowd.append([PF[pf], r["category"], int(r["lives"]), int(r["small_lives"]),
+                               f"{r['viewers_per_small_live']:.1f}", pct(r["small_share_of_viewers"], 0)])
+    head = ["플랫폼", "카테고리", "전체 방송", "소규모 방송", "소규모 방송 1개당 평균 시청자", "카테고리 시청자 중 소규모 몫"]
+    v["table_s5b_top"] = md_table(head + ["가장 큰 방송 1개의 몫"], rows_top) if rows_top else "_자료 없음_"
+    v["table_s5b_crowded"] = md_table(head, rows_crowd) if rows_crowd else "_자료 없음_"
+    pol = pd.read_csv(ROOT / "data/policy/policies.csv", dtype=str).fillna("")
+    pol = pol[pol.ladder_effect.str.contains("진입|중간")]
+    v["table_ladder_tools"] = md_table(
+        ["플랫폼", "제도", "대상", "조건·내용", "근거(코딩표 ID)"],
+        [[PF[r.platform], r.policy, r.beneficiary_tiers.replace(";", "·"), r.key_terms, r.id] for r in pol.itertuples()])
 
 
 def study2(v: dict) -> None:
@@ -216,25 +245,25 @@ def study3(v: dict) -> None:
     rows = []
     for variant, label in (("main_excl_hero", "카드 섹션(상단 히어로 제외)"), ("incl_hero", "상단 히어로 포함")):
         for r in s["rounds"].get(variant, []):
-            rows.append([label, r["round_id"], PF[r["platform"]], r["n_rec"], r["n_rec_hakko"], pct(r["rec_hakko_share"]),
-                         num(r.get("n_base_big")), num(r.get("total_lives")), pct(r["base_hakko_share"]),
+            rows.append([label, r["round_id"], PF[r["platform"]], r["n_rec"], r["n_rec_small"], pct(r["rec_small_share"]),
+                         num(r.get("n_base_big")), num(r.get("total_lives")), pct(r["base_small_share"]),
                          "—" if pd.isna(r["exposure_ratio"]) else f"{r['exposure_ratio']:.2f}",
                          num(r["rec_median_viewers"]), r.get("total_source") or ""])
-    v["table_s3"] = md_table(["범위", "회차", "플랫폼", "추천 채널", "추천 중 하꼬", "추천 하꼬 비율", "기준선 50명 이상",
-                              "전체 라이브", "전체 하꼬 비율", "노출 비율", "추천 동접 중앙값", "전체 수 출처"], rows)
+    v["table_s3"] = md_table(["범위", "회차", "플랫폼", "추천 채널", "추천 중 소규모 방송", "추천 소규모 방송 비율", "기준선 50명 이상",
+                              "전체 라이브", "전체 소규모 방송 비율", "노출 비율", "추천 동접 중앙값", "전체 수 출처"], rows)
     rounds = pd.DataFrame(s["rounds"].get("main_excl_hero", []))
     for pf in ("chzzk", "soop"):
         rr = rounds[rounds.platform == pf] if len(rounds) else rounds
-        v[f"s3_rec_share_{pf}"] = pct(rr.rec_hakko_share.mean()) if len(rr) else "—"
-        v[f"s3_base_share_{pf}"] = pct(rr.base_hakko_share.mean()) if len(rr) else "—"
+        v[f"s3_rec_share_{pf}"] = pct(rr.rec_small_share.mean()) if len(rr) else "—"
+        v[f"s3_base_share_{pf}"] = pct(rr.base_small_share.mean()) if len(rr) else "—"
         v[f"s3_total_{pf}"] = num(rr.total_lives.mean()) if len(rr) else "—"
         v[f"s3_big_{pf}"] = num(rr.n_base_big.mean()) if len(rr) else "—"
         r = s["by_platform"].get("main_excl_hero", {}).get(pf, {})
         v[f"s3_ratio_{pf}"] = "—" if not r or r.get("ratio") is None or pd.isna(r.get("ratio")) else f"{r['ratio']:.2f}"
     sec = pd.read_csv(OUT / "study3_sections.csv")
     v["table_s3_sections"] = md_table(
-        ["플랫폼", "섹션", "카드", "하꼬 카드", "동접 중앙값", "공식 채널", "파트너", "챌린저"],
-        [[PF[r.platform], r.section, r.cards, int(r.hakko), num(r.median_viewers), int(r.official),
+        ["플랫폼", "섹션", "카드", "소규모 방송 카드", "동접 중앙값", "공식 채널", "파트너", "챌린저"],
+        [[PF[r.platform], r.section, r.cards, int(r.small), num(r.median_viewers), int(r.official),
           int(r.partner) if r.platform == "chzzk" else "—", int(r.challenger) if r.platform == "chzzk" else "—"]
          for r in sec.itertuples()])
     tp = OUT / "study3_chzzk_tiers.csv"
@@ -272,7 +301,7 @@ def study4(v: dict) -> None:
 
 def main() -> int:
     v: dict = {}
-    study1(v); study1_zipf(v); study2(v); study2a(v); study3(v); study4(v); study5(v)
+    study1(v); study1_zipf(v); study2(v); study2a(v); study3(v); study4(v); study5(v); study5b(v)
     tpl = (HERE / "paper_template.md").read_text(encoding="utf-8")
     missing = sorted(set(re.findall(r"\{\{(\w+)\}\}", tpl)) - set(v))
     if missing:

@@ -15,7 +15,7 @@ common:
   baseline_max_minutes: 60     # 전체 라이브 목록 최대 수집 시간
   baseline_stall_scrolls: 3    # 새 방송이 3번 연속 안 늘면 끝으로 본다
   # 기준선 모드
-  #   threshold(기본): 시청자순 목록을 하꼬 경계(동접 50 미만)가 나올 때까지만 내려
+  #   threshold(기본): 시청자순 목록을 50명 경계(동접 50 미만)가 나올 때까지만 내려
   #     50명 이상 방송 수를 정확히 세고, 전체 라이브 수는 아래 total_* 로 따로 구한다.
   #   full: 목록 끝까지 내린다 (검증용, 회차당 수십 분).
   baseline_mode: threshold

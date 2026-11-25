@@ -76,8 +76,8 @@ CREATE TABLE IF NOT EXISTS audit_baseline_meta (
     platform TEXT NOT NULL,
     mode TEXT,                       -- threshold | full
     n_loaded INTEGER,                -- 받은 방송 수
-    min_loaded_viewers INTEGER,      -- 받은 방송 중 최소 동접 (threshold면 하꼬 경계 아래여야 정상)
-    crossed_threshold INTEGER,       -- 하꼬 경계를 넘어 내려갔는지
+    min_loaded_viewers INTEGER,      -- 받은 방송 중 최소 동접 (threshold면 50명 경계 아래여야 정상)
+    crossed_threshold INTEGER,       -- 50명 경계를 넘어 내려갔는지
     total_lives INTEGER,             -- 같은 시각 전체 라이브 수
     total_source TEXT,
     total_complete INTEGER,          -- 전체 수 산출 응답을 끝까지 받았는지
@@ -397,10 +397,10 @@ def build_home_rows(platform, cfg, seen, responses, official_patterns) -> list[d
 
 
 def collect_baseline(browser, platform: str, sel: dict, raw_dir: Path, max_minutes: float, mode: str,
-                     hakko_max: int, log):
+                     small_max: int, log):
     """시청자순 전체 라이브 목록을 내리며 페이지가 받은 목록 응답을 모은다.
 
-    threshold 모드: 마지막으로 받은 방송의 동접이 hakko_max 이하가 되면 한 페이지 더 받고 멈춘다.
+    threshold 모드: 마지막으로 받은 방송의 동접이 small_max 이하가 되면 한 페이지 더 받고 멈춘다.
     full 모드: 목록 끝까지 (치지직은 next 없음, 숲은 전체 수만큼).
     """
     common, cfg = sel["common"], sel[platform]
@@ -443,7 +443,7 @@ def collect_baseline(browser, platform: str, sel: dict, raw_dir: Path, max_minut
             if at_end:
                 reached_end = True
                 break
-            if last_viewers is not None and last_viewers <= hakko_max:
+            if last_viewers is not None and last_viewers <= small_max:
                 if mode == "threshold":
                     if crossed and extra_left <= 0:
                         break
@@ -623,12 +623,12 @@ def main(argv=None) -> int:
         if args.baseline and not blocked:
             max_min = args.baseline_max_minutes or sel["common"]["baseline_max_minutes"]
             mode = args.baseline_mode or sel["common"].get("baseline_mode", "threshold")
-            hakko_max = load_settings()["hakko_max_viewers"]
+            small_max = load_settings()["small_max_viewers"]
             for pf in platforms:
                 time.sleep(30)
                 started = now_kst().isoformat(timespec="seconds")
                 try:
-                    rows, end, desc, meta = collect_baseline(browser, pf, sel, raw_dir, max_min, mode, hakko_max, log)
+                    rows, end, desc, meta = collect_baseline(browser, pf, sel, raw_dir, max_min, mode, small_max, log)
                     if pf == "chzzk" and not end:
                         time.sleep(30)
                         meta.update(collect_chzzk_total(browser, sel, raw_dir, max_min, log))

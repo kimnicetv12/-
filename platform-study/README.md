@@ -54,7 +54,7 @@ python -m pytest -q tests
 ```
 - 기준선 회차(`--baseline`)는 연구 5 전수 스냅샷도 겸한다. 숲까지 전체를 받으려면 `--baseline-mode full`(숲 약 10분).
 - 한 회차의 홈 수집은 두 플랫폼 합쳐 약 4분(스크롤 사이 30초 × 3번 × 2)이라 "5분 안에 연달아" 조건을 지킨다.
-- 기준선(threshold 모드)은 하꼬 경계(동접 50명 미만)가 나올 때까지만 시청자순 목록을 내리고,
+- 기준선(threshold 모드)은 50명 경계(동접 50명 미만)가 나올 때까지만 시청자순 목록을 내리고,
   전체 라이브 수는 숲은 목록 응답의 `totalCount`, 치지직은 카테고리 페이지의 `openLiveCount` 합으로 얻는다.
   끝까지 내리는 검증용 실행은 `--baseline-mode full`.
 - 429나 차단 화면이 나오면 `data/logs/blocks.jsonl`에 남기고 멈춘다. 다시 돌리기 전에 원인을 확인한다.
@@ -64,7 +64,7 @@ python -m pytest -q tests
 사이트 개편으로 카드가 0개 잡히면 `config/selectors.yaml`만 고친다. 확인 방법은 HANDOFF.md의 "DOM 점검" 참고.
 
 ## 데이터 출처와 제약
-- stream-rate.com/viewership: robots.txt 전면 허용. 섭외용으로 추린 약 550명 명단이라 하꼬 구간이 빠져 있다.
+- stream-rate.com/viewership: robots.txt 전면 허용. 섭외용으로 추린 약 550명 명단이라 소규모 구간이 빠져 있다.
 - weflview.com 과거 랭킹: 화면이 robots.txt 금지 경로(`/api/`)에서 데이터를 불러와 쓰지 않았다.
 - softc.one(소프트콘): 봇 확인 화면(HTTP 429)이 떠서 규칙대로 기록하고 중단했다. 소프트콘 수치는 기사 인용으로만 쓴다.
 - 치지직·숲 홈과 목록: robots.txt 전면 허용. 페이지가 스스로 받은 응답만 읽는다.

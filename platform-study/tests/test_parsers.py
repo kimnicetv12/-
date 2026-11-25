@@ -85,6 +85,6 @@ def test_live_snapshot_stats():
     m = pd.Series({"round_id": "r", "platform": "chzzk", "total_viewers": 1100, "total_lives": 10,
                    "mode": "threshold", "crossed_threshold": 1})
     out = snapshot_stats(b, m, 49)
-    assert out["hakko_live_share"] == pytest.approx(0.6)
-    assert out["hakko_viewer_share"] == pytest.approx((1100 - 960) / 1100)
+    assert out["small_live_share"] == pytest.approx(0.6)
+    assert out["small_viewer_share"] == pytest.approx((1100 - 960) / 1100)
     assert out["official_viewer_share"] == pytest.approx(500 / 1100)
