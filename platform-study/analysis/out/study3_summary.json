@@ -12,11 +12,11 @@
         "rec_small_share": 0.4827586206896552,
         "baseline_round": "20261125T1152-fdd3",
         "n_base_loaded": 118,
-        "n_base_big": 117,
-        "total_lives": 1355,
+        "n_base_big": 117.0,
+        "total_lives": 1355.0,
         "total_source": "category openLiveCount sum (219 categories)",
         "base_small_share": 0.9136531365313654,
-        "base_reached_end": 0,
+        "base_reached_end": 0.0,
         "exposure_ratio": 0.5283828198986129,
         "rec_median_viewers": 114.0,
         "base_median_viewers": 105.5
@@ -31,14 +31,52 @@
         "rec_small_share": 0.25925925925925924,
         "baseline_round": "20261125T1137-ab5a",
         "n_base_loaded": 294,
-        "n_base_big": 126,
-        "total_lives": 1140,
+        "n_base_big": 126.0,
+        "total_lives": 1140.0,
         "total_source": "list totalCount",
         "base_small_share": 0.8894736842105263,
-        "base_reached_end": 0,
+        "base_reached_end": 0.0,
         "exposure_ratio": 0.2914749068595222,
         "rec_median_viewers": 269.0,
         "base_median_viewers": 41.0
+      },
+      {
+        "round_id": "20261125T1805-7315",
+        "platform": "chzzk",
+        "time_slot": 18,
+        "event": 0,
+        "n_rec": 28,
+        "n_rec_small": 9,
+        "rec_small_share": 0.32142857142857145,
+        "baseline_round": NaN,
+        "n_base_loaded": 0,
+        "n_base_big": NaN,
+        "total_lives": NaN,
+        "total_source": "",
+        "base_small_share": NaN,
+        "base_reached_end": NaN,
+        "exposure_ratio": NaN,
+        "rec_median_viewers": 972.0,
+        "base_median_viewers": NaN
+      },
+      {
+        "round_id": "20261125T1805-7315",
+        "platform": "soop",
+        "time_slot": 18,
+        "event": 0,
+        "n_rec": 29,
+        "n_rec_small": 0,
+        "rec_small_share": 0.0,
+        "baseline_round": "20261125T1805-7315",
+        "n_base_loaded": 2278,
+        "n_base_big": 278.0,
+        "total_lives": 2578.0,
+        "total_source": "list totalCount",
+        "base_small_share": 0.8921644685802947,
+        "base_reached_end": 0.0,
+        "exposure_ratio": 0.0,
+        "rec_median_viewers": 901.0,
+        "base_median_viewers": 9.0
       }
     ],
     "incl_hero": [
@@ -52,11 +90,11 @@
         "rec_small_share": 0.47058823529411764,
         "baseline_round": "20261125T1152-fdd3",
         "n_base_loaded": 118,
-        "n_base_big": 117,
-        "total_lives": 1355,
+        "n_base_big": 117.0,
+        "total_lives": 1355.0,
         "total_source": "category openLiveCount sum (219 categories)",
         "base_small_share": 0.9136531365313654,
-        "base_reached_end": 0,
+        "base_reached_end": 0.0,
         "exposure_ratio": 0.5150622446070512,
         "rec_median_viewers": 124.5,
         "base_median_viewers": 105.5
@@ -71,14 +109,52 @@
         "rec_small_share": 0.25925925925925924,
         "baseline_round": "20261125T1137-ab5a",
         "n_base_loaded": 294,
-        "n_base_big": 126,
-        "total_lives": 1140,
+        "n_base_big": 126.0,
+        "total_lives": 1140.0,
         "total_source": "list totalCount",
         "base_small_share": 0.8894736842105263,
-        "base_reached_end": 0,
+        "base_reached_end": 0.0,
         "exposure_ratio": 0.2914749068595222,
         "rec_median_viewers": 269.0,
         "base_median_viewers": 41.0
+      },
+      {
+        "round_id": "20261125T1805-7315",
+        "platform": "chzzk",
+        "time_slot": 18,
+        "event": 0,
+        "n_rec": 33,
+        "n_rec_small": 9,
+        "rec_small_share": 0.2727272727272727,
+        "baseline_round": NaN,
+        "n_base_loaded": 0,
+        "n_base_big": NaN,
+        "total_lives": NaN,
+        "total_source": "",
+        "base_small_share": NaN,
+        "base_reached_end": NaN,
+        "exposure_ratio": NaN,
+        "rec_median_viewers": 829.0,
+        "base_median_viewers": NaN
+      },
+      {
+        "round_id": "20261125T1805-7315",
+        "platform": "soop",
+        "time_slot": 18,
+        "event": 0,
+        "n_rec": 29,
+        "n_rec_small": 0,
+        "rec_small_share": 0.0,
+        "baseline_round": "20261125T1805-7315",
+        "n_base_loaded": 2278,
+        "n_base_big": 278.0,
+        "total_lives": 2578.0,
+        "total_source": "list totalCount",
+        "base_small_share": 0.8921644685802947,
+        "base_reached_end": 0.0,
+        "exposure_ratio": 0.0,
+        "rec_median_viewers": 901.0,
+        "base_median_viewers": 9.0
       }
     ]
   },
@@ -91,10 +167,10 @@
         "n_rounds": 1
       },
       "soop": {
-        "ratio": 0.2914749068595222,
+        "ratio": 0.1403202999488932,
         "ci_lo": NaN,
         "ci_hi": NaN,
-        "n_rounds": 1
+        "n_rounds": 2
       }
     },
     "incl_hero": {
@@ -105,10 +181,10 @@
         "n_rounds": 1
       },
       "soop": {
-        "ratio": 0.2914749068595222,
+        "ratio": 0.1403202999488932,
         "ci_lo": NaN,
         "ci_hi": NaN,
-        "n_rounds": 1
+        "n_rounds": 2
       }
     }
   },
@@ -120,11 +196,23 @@
           "ci_lo": NaN,
           "ci_hi": NaN,
           "n_rounds": 1
+        },
+        "18": {
+          "ratio": NaN,
+          "ci_lo": NaN,
+          "ci_hi": NaN,
+          "n_rounds": 0
         }
       },
       "soop": {
         "12": {
           "ratio": 0.2914749068595222,
+          "ci_lo": NaN,
+          "ci_hi": NaN,
+          "n_rounds": 1
+        },
+        "18": {
+          "ratio": 0.0,
           "ci_lo": NaN,
           "ci_hi": NaN,
           "n_rounds": 1
@@ -138,6 +226,12 @@
           "ci_lo": NaN,
           "ci_hi": NaN,
           "n_rounds": 1
+        },
+        "18": {
+          "ratio": NaN,
+          "ci_lo": NaN,
+          "ci_hi": NaN,
+          "n_rounds": 0
         }
       },
       "soop": {
@@ -146,11 +240,17 @@
           "ci_lo": NaN,
           "ci_hi": NaN,
           "n_rounds": 1
+        },
+        "18": {
+          "ratio": 0.0,
+          "ci_lo": NaN,
+          "ci_hi": NaN,
+          "n_rounds": 1
         }
       }
     }
   },
-  "n_home_rounds": 1,
-  "n_baselines": 3,
+  "n_home_rounds": 2,
+  "n_baselines": 4,
   "ready": false
 }

@@ -172,6 +172,9 @@ def study5(v: dict) -> None:
         v[f"s5_official_{pf}"] = pct(d.official_viewer_share.mean(), 2) if len(d) else "—"
         v[f"s5_lives_{pf}"] = num(d.total_lives.mean()) if len(d) else "—"
         v[f"s5_viewers_{pf}"] = num(d.total_viewers.mean()) if len(d) else "—"
+    dz = df[df.platform == "chzzk"] if len(df) and "partner_viewer_share" in df else pd.DataFrame()
+    v["s5_partner_min"] = pct(dz.partner_viewer_share.min(), 0) if len(dz) else "—"
+    v["s5_partner_max"] = pct(dz.partner_viewer_share.max(), 0) if len(dz) else "—"
     if len(df):
         rows = []
         for r in df.itertuples():
@@ -195,15 +198,15 @@ def study5b(v: dict) -> None:
         d = s["platforms"].get(pf)
         v[f"s5b_median_{pf}"] = f"{d['median_viewers_per_small_live']:.1f}" if d else "—"
         v[f"s5b_ncat_{pf}"] = d["n_categories"] if d else 0
-        v[f"s5b_round_{pf}"] = (lambda t: f"{t[4:6]}/{t[6:8]} {t[9:11]}:{t[11:13]}")(d["rounds"][0]) if d else "—"
+        v[f"s5b_round_{pf}"] = ", ".join(f"{t[4:6]}/{t[6:8]} {t[9:11]}:{t[11:13]}" for t in d["rounds"]) if d else "—"
         if not d:
             continue
         for r in d["top"][:8]:
-            rows_top.append([PF[pf], r["category"], int(r["lives"]), int(r["small_lives"]),
+            rows_top.append([PF[pf], r["category"], num(r["lives"]), num(r["small_lives"]),
                              f"{r['viewers_per_small_live']:.1f}", pct(r["small_share_of_viewers"], 0),
                              pct(r["top_live_share"], 0)])
         for r in d["crowded"]:
-            rows_crowd.append([PF[pf], r["category"], int(r["lives"]), int(r["small_lives"]),
+            rows_crowd.append([PF[pf], r["category"], num(r["lives"]), num(r["small_lives"]),
                                f"{r['viewers_per_small_live']:.1f}", pct(r["small_share_of_viewers"], 0)])
     head = ["플랫폼", "카테고리", "전체 방송", "소규모 방송", "소규모 방송 1개당 평균 시청자", "카테고리 시청자 중 소규모 몫"]
     v["table_s5b_top"] = md_table(head + ["가장 큰 방송 1개의 몫"], rows_top) if rows_top else "_자료 없음_"

@@ -1,7 +1,7 @@
 {
   "n_snapshots": {
-    "chzzk": 2,
-    "soop": 1
+    "chzzk": 3,
+    "soop": 2
   },
   "figure": "paper/figures/fig5_viewer_share_by_size.png",
   "rows": [
@@ -85,6 +85,60 @@
       "bin_500–999": 0.12939192248483203,
       "bin_1,000–4,999": 0.22513130489903105,
       "bin_5,000+": 0.27849089921217063
+    },
+    {
+      "round_id": "20261125T1805-7315",
+      "platform": "chzzk",
+      "total_lives": 2793,
+      "total_viewers": 177854,
+      "full_list": 0,
+      "top1_share": 0.08582882589089928,
+      "top10_share": 0.40045767877022725,
+      "top1pct_n": 28,
+      "top1pct_share": 0.5803974046127722,
+      "complete_above_threshold": 0,
+      "n_loaded": 78,
+      "n_missing": 2715,
+      "min_loaded": 370,
+      "small_live_share": NaN,
+      "small_viewer_share": NaN,
+      "official_viewer_share": 0.0,
+      "gini_all": NaN,
+      "partner_viewer_share": 0.66394345924185,
+      "challenger_viewer_share": 0.06052717397415858,
+      "bin_0–49 (소규모)": NaN,
+      "bin_50–99": NaN,
+      "bin_100–499": NaN,
+      "bin_500–999": 0.10769507573627807,
+      "bin_1,000–4,999": 0.32115105648453224,
+      "bin_5,000+": 0.3003587211982862
+    },
+    {
+      "round_id": "20261125T1805-7315",
+      "platform": "soop",
+      "total_lives": 2578,
+      "total_viewers": 176866,
+      "full_list": 1,
+      "top1_share": 0.205997761016815,
+      "top10_share": 0.44480567209073535,
+      "top1pct_n": 26,
+      "top1pct_share": 0.5635905148530526,
+      "complete_above_threshold": 1,
+      "n_loaded": 2278,
+      "n_missing": 300,
+      "min_loaded": 0,
+      "small_live_share": 0.8921644685802947,
+      "small_viewer_share": 0.12531521038526341,
+      "official_viewer_share": 0.0,
+      "gini_all": 0.8980478284713351,
+      "partner_viewer_share": NaN,
+      "challenger_viewer_share": NaN,
+      "bin_0–49 (소규모)": 0.12531521038526341,
+      "bin_50–99": 0.0433378942250065,
+      "bin_100–499": 0.14110117263917316,
+      "bin_500–999": 0.10860764646681668,
+      "bin_1,000–4,999": 0.2629052503024889,
+      "bin_5,000+": 0.31873282598125136
     }
   ]
 }

@@ -231,3 +231,9 @@
 2026-11-25 06:19:36,278 INFO GET https://stream-rate.com/viewership/%EC%B2%9C%EC%96%91/ -> 200 (39607 bytes)
 2026-11-25 06:20:06,517 INFO GET https://stream-rate.com/viewership/Fresh%ED%86%A0%EB%A7%88%ED%86%A0/ -> 200 (46805 bytes)
 2026-11-25 06:20:06,528 INFO history: done
+2026-11-25 09:07:44,678 INFO [20261125T1805-7315] home chzzk: 35 cards
+2026-11-25 09:09:35,397 INFO [20261125T1805-7315] home soop: 36 cards
+2026-11-25 09:13:06,148 WARNING baseline chzzk: 새 방송이 3번 연속 늘지 않아 멈춤 (n=78)
+2026-11-25 09:19:58,073 INFO [20261125T1805-7315] baseline chzzk: loaded 78 (min 370), total 2793 (category openLiveCount sum (354 categories)), end=False, sorted=1
+2026-11-25 09:44:19,967 WARNING baseline soop: 새 방송이 3번 연속 늘지 않아 멈춤 (n=2278)
+2026-11-25 09:44:20,317 INFO [20261125T1805-7315] baseline soop: loaded 2278 (min 0), total 2578 (list totalCount), end=False, sorted=0

@@ -83,6 +83,20 @@ def finish(g: pd.DataFrame, platform: str, round_id: str) -> pd.DataFrame:
     return g
 
 
+def pool_rounds(per_round: pd.DataFrame) -> pd.DataFrame:
+    """여러 시각의 스냅샷을 카테고리별로 합친다. 방송 수는 회차 평균, 비율은 합계끼리 나눈다."""
+    g = per_round.groupby(["platform", "category"]).agg(
+        n_rounds=("round_id", "nunique"), lives=("lives", "mean"), small_lives=("small_lives", "mean"),
+        viewers_sum=("viewers", "sum"), small_viewers_sum=("small_viewers", "sum"),
+        small_lives_sum=("small_lives", "sum"), top_live_share=("top_live_share", "mean")).reset_index()
+    g["viewers_per_small_live"] = g.small_viewers_sum / g.small_lives_sum.replace(0, np.nan)
+    g["small_share_of_viewers"] = g.small_viewers_sum / g.viewers_sum.replace(0, np.nan)
+    g["small_share_of_lives"] = g.small_lives / g.lives
+    rounds = per_round.groupby("platform").round_id.apply(lambda s: sorted(s.unique())).to_dict()
+    g["rounds"] = g.platform.map(lambda p: ",".join(rounds[p]))
+    return g
+
+
 def figure(df: pd.DataFrame) -> str | None:
     d = df[df.small_lives >= MIN_SMALL_LIVES]
     if d.empty:
@@ -128,7 +142,9 @@ def main() -> int:
             g = chzzk_categories(m.round_id, b, small_max)
             if len(g):
                 frames.append(finish(g, "chzzk", m.round_id))
-    df = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+    per_round = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+    per_round.to_csv(OUT / "study5b_categories_by_round.csv", index=False, encoding="utf-8-sig")
+    df = pool_rounds(per_round) if len(per_round) else per_round
     df.to_csv(OUT / "study5b_categories.csv", index=False, encoding="utf-8-sig")
     summary = {"min_small_lives": MIN_SMALL_LIVES, "figure": figure(df) if len(df) else None, "platforms": {}}
     for pf in ("chzzk", "soop"):
@@ -136,7 +152,7 @@ def main() -> int:
         if not len(d):
             continue
         summary["platforms"][pf] = {
-            "rounds": sorted(d.round_id.unique().tolist()),
+            "rounds": d.rounds.iloc[0].split(","),
             "n_categories": int(len(d)),
             "median_viewers_per_small_live": float(d.viewers_per_small_live.median()),
             "top": d.nlargest(10, "viewers_per_small_live")[
