@@ -1,0 +1,368 @@
+{
+  "small_definition": "동접 49명 이하(50명 미만)",
+  "rounds": {
+    "main_excl_hero": [
+      {
+        "round_id": "20261125T1137-ab5a",
+        "platform": "chzzk",
+        "time_slot": 12,
+        "event": 0,
+        "n_rec": 29,
+        "n_rec_small": 14,
+        "rec_small_share": 0.4827586206896552,
+        "baseline_round": "20261125T1152-fdd3",
+        "n_base_loaded": 118,
+        "n_base_big": 117.0,
+        "total_lives": 1355.0,
+        "total_source": "category openLiveCount sum (219 categories)",
+        "base_small_share": 0.9136531365313654,
+        "base_reached_end": 0.0,
+        "exposure_ratio": 0.5283828198986129,
+        "exposure_ratio_lower_bound": 0.5283828198986129,
+        "rec_median_viewers": 114.0,
+        "base_median_viewers": 105.5
+      },
+      {
+        "round_id": "20261125T1137-ab5a",
+        "platform": "soop",
+        "time_slot": 12,
+        "event": 0,
+        "n_rec": 27,
+        "n_rec_small": 7,
+        "rec_small_share": 0.25925925925925924,
+        "baseline_round": "20261125T1137-ab5a",
+        "n_base_loaded": 294,
+        "n_base_big": 126.0,
+        "total_lives": 1140.0,
+        "total_source": "list totalCount",
+        "base_small_share": 0.8894736842105263,
+        "base_reached_end": 0.0,
+        "exposure_ratio": 0.2914749068595222,
+        "exposure_ratio_lower_bound": 0.2914749068595222,
+        "rec_median_viewers": 269.0,
+        "base_median_viewers": 41.0
+      },
+      {
+        "round_id": "20261125T1805-7315",
+        "platform": "chzzk",
+        "time_slot": 18,
+        "event": 0,
+        "n_rec": 28,
+        "n_rec_small": 9,
+        "rec_small_share": 0.32142857142857145,
+        "baseline_round": NaN,
+        "n_base_loaded": 0,
+        "n_base_big": NaN,
+        "total_lives": NaN,
+        "total_source": "",
+        "base_small_share": NaN,
+        "base_reached_end": NaN,
+        "exposure_ratio": NaN,
+        "exposure_ratio_lower_bound": 0.3306629834254144,
+        "rec_median_viewers": 972.0,
+        "base_median_viewers": NaN
+      },
+      {
+        "round_id": "20261125T1805-7315",
+        "platform": "soop",
+        "time_slot": 18,
+        "event": 0,
+        "n_rec": 29,
+        "n_rec_small": 0,
+        "rec_small_share": 0.0,
+        "baseline_round": "20261125T1805-7315",
+        "n_base_loaded": 2278,
+        "n_base_big": 278.0,
+        "total_lives": 2578.0,
+        "total_source": "list totalCount",
+        "base_small_share": 0.8921644685802947,
+        "base_reached_end": 0.0,
+        "exposure_ratio": 0.0,
+        "exposure_ratio_lower_bound": 0.0,
+        "rec_median_viewers": 901.0,
+        "base_median_viewers": 9.0
+      },
+      {
+        "round_id": "20261125T2206-9cfd",
+        "platform": "chzzk",
+        "time_slot": 22,
+        "event": 0,
+        "n_rec": 30,
+        "n_rec_small": 12,
+        "rec_small_share": 0.4,
+        "baseline_round": NaN,
+        "n_base_loaded": 0,
+        "n_base_big": NaN,
+        "total_lives": NaN,
+        "total_source": "",
+        "base_small_share": NaN,
+        "base_reached_end": NaN,
+        "exposure_ratio": NaN,
+        "exposure_ratio_lower_bound": 0.4077524429967427,
+        "rec_median_viewers": 432.5,
+        "base_median_viewers": NaN
+      },
+      {
+        "round_id": "20261125T2206-9cfd",
+        "platform": "soop",
+        "time_slot": 22,
+        "event": 0,
+        "n_rec": 30,
+        "n_rec_small": 5,
+        "rec_small_share": 0.16666666666666666,
+        "baseline_round": "20261125T2206-9cfd",
+        "n_base_loaded": 2556,
+        "n_base_big": 429.0,
+        "total_lives": 4403.0,
+        "total_source": "list totalCount",
+        "base_small_share": 0.9025664319781966,
+        "base_reached_end": 0.0,
+        "exposure_ratio": 0.1846586143264553,
+        "exposure_ratio_lower_bound": 0.1846586143264553,
+        "rec_median_viewers": 1441.0,
+        "base_median_viewers": 18.0
+      }
+    ],
+    "incl_hero": [
+      {
+        "round_id": "20261125T1137-ab5a",
+        "platform": "chzzk",
+        "time_slot": 12,
+        "event": 0,
+        "n_rec": 34,
+        "n_rec_small": 16,
+        "rec_small_share": 0.47058823529411764,
+        "baseline_round": "20261125T1152-fdd3",
+        "n_base_loaded": 118,
+        "n_base_big": 117.0,
+        "total_lives": 1355.0,
+        "total_source": "category openLiveCount sum (219 categories)",
+        "base_small_share": 0.9136531365313654,
+        "base_reached_end": 0.0,
+        "exposure_ratio": 0.5150622446070512,
+        "exposure_ratio_lower_bound": 0.5150622446070512,
+        "rec_median_viewers": 124.5,
+        "base_median_viewers": 105.5
+      },
+      {
+        "round_id": "20261125T1137-ab5a",
+        "platform": "soop",
+        "time_slot": 12,
+        "event": 0,
+        "n_rec": 27,
+        "n_rec_small": 7,
+        "rec_small_share": 0.25925925925925924,
+        "baseline_round": "20261125T1137-ab5a",
+        "n_base_loaded": 294,
+        "n_base_big": 126.0,
+        "total_lives": 1140.0,
+        "total_source": "list totalCount",
+        "base_small_share": 0.8894736842105263,
+        "base_reached_end": 0.0,
+        "exposure_ratio": 0.2914749068595222,
+        "exposure_ratio_lower_bound": 0.2914749068595222,
+        "rec_median_viewers": 269.0,
+        "base_median_viewers": 41.0
+      },
+      {
+        "round_id": "20261125T1805-7315",
+        "platform": "chzzk",
+        "time_slot": 18,
+        "event": 0,
+        "n_rec": 33,
+        "n_rec_small": 9,
+        "rec_small_share": 0.2727272727272727,
+        "baseline_round": NaN,
+        "n_base_loaded": 0,
+        "n_base_big": NaN,
+        "total_lives": NaN,
+        "total_source": "",
+        "base_small_share": NaN,
+        "base_reached_end": NaN,
+        "exposure_ratio": NaN,
+        "exposure_ratio_lower_bound": 0.28056253139126064,
+        "rec_median_viewers": 829.0,
+        "base_median_viewers": NaN
+      },
+      {
+        "round_id": "20261125T1805-7315",
+        "platform": "soop",
+        "time_slot": 18,
+        "event": 0,
+        "n_rec": 29,
+        "n_rec_small": 0,
+        "rec_small_share": 0.0,
+        "baseline_round": "20261125T1805-7315",
+        "n_base_loaded": 2278,
+        "n_base_big": 278.0,
+        "total_lives": 2578.0,
+        "total_source": "list totalCount",
+        "base_small_share": 0.8921644685802947,
+        "base_reached_end": 0.0,
+        "exposure_ratio": 0.0,
+        "exposure_ratio_lower_bound": 0.0,
+        "rec_median_viewers": 901.0,
+        "base_median_viewers": 9.0
+      },
+      {
+        "round_id": "20261125T2206-9cfd",
+        "platform": "chzzk",
+        "time_slot": 22,
+        "event": 0,
+        "n_rec": 35,
+        "n_rec_small": 12,
+        "rec_small_share": 0.34285714285714286,
+        "baseline_round": NaN,
+        "n_base_loaded": 0,
+        "n_base_big": NaN,
+        "total_lives": NaN,
+        "total_source": "",
+        "base_small_share": NaN,
+        "base_reached_end": NaN,
+        "exposure_ratio": NaN,
+        "exposure_ratio_lower_bound": 0.349502093997208,
+        "rec_median_viewers": 372.0,
+        "base_median_viewers": NaN
+      },
+      {
+        "round_id": "20261125T2206-9cfd",
+        "platform": "soop",
+        "time_slot": 22,
+        "event": 0,
+        "n_rec": 30,
+        "n_rec_small": 5,
+        "rec_small_share": 0.16666666666666666,
+        "baseline_round": "20261125T2206-9cfd",
+        "n_base_loaded": 2556,
+        "n_base_big": 429.0,
+        "total_lives": 4403.0,
+        "total_source": "list totalCount",
+        "base_small_share": 0.9025664319781966,
+        "base_reached_end": 0.0,
+        "exposure_ratio": 0.1846586143264553,
+        "exposure_ratio_lower_bound": 0.1846586143264553,
+        "rec_median_viewers": 1441.0,
+        "base_median_viewers": 18.0
+      }
+    ]
+  },
+  "by_platform": {
+    "main_excl_hero": {
+      "chzzk": {
+        "ratio": 0.5283828198986129,
+        "ci_lo": NaN,
+        "ci_hi": NaN,
+        "n_rounds": 1
+      },
+      "soop": {
+        "ratio": 0.1559510975944528,
+        "ci_lo": NaN,
+        "ci_hi": NaN,
+        "n_rounds": 3
+      }
+    },
+    "incl_hero": {
+      "chzzk": {
+        "ratio": 0.5150622446070512,
+        "ci_lo": NaN,
+        "ci_hi": NaN,
+        "n_rounds": 1
+      },
+      "soop": {
+        "ratio": 0.1559510975944528,
+        "ci_lo": NaN,
+        "ci_hi": NaN,
+        "n_rounds": 3
+      }
+    }
+  },
+  "by_slot": {
+    "main_excl_hero": {
+      "chzzk": {
+        "12": {
+          "ratio": 0.5283828198986129,
+          "ci_lo": NaN,
+          "ci_hi": NaN,
+          "n_rounds": 1
+        },
+        "18": {
+          "ratio": NaN,
+          "ci_lo": NaN,
+          "ci_hi": NaN,
+          "n_rounds": 0
+        },
+        "22": {
+          "ratio": NaN,
+          "ci_lo": NaN,
+          "ci_hi": NaN,
+          "n_rounds": 0
+        }
+      },
+      "soop": {
+        "12": {
+          "ratio": 0.2914749068595222,
+          "ci_lo": NaN,
+          "ci_hi": NaN,
+          "n_rounds": 1
+        },
+        "18": {
+          "ratio": 0.0,
+          "ci_lo": NaN,
+          "ci_hi": NaN,
+          "n_rounds": 1
+        },
+        "22": {
+          "ratio": 0.1846586143264553,
+          "ci_lo": NaN,
+          "ci_hi": NaN,
+          "n_rounds": 1
+        }
+      }
+    },
+    "incl_hero": {
+      "chzzk": {
+        "12": {
+          "ratio": 0.5150622446070512,
+          "ci_lo": NaN,
+          "ci_hi": NaN,
+          "n_rounds": 1
+        },
+        "18": {
+          "ratio": NaN,
+          "ci_lo": NaN,
+          "ci_hi": NaN,
+          "n_rounds": 0
+        },
+        "22": {
+          "ratio": NaN,
+          "ci_lo": NaN,
+          "ci_hi": NaN,
+          "n_rounds": 0
+        }
+      },
+      "soop": {
+        "12": {
+          "ratio": 0.2914749068595222,
+          "ci_lo": NaN,
+          "ci_hi": NaN,
+          "n_rounds": 1
+        },
+        "18": {
+          "ratio": 0.0,
+          "ci_lo": NaN,
+          "ci_hi": NaN,
+          "n_rounds": 1
+        },
+        "22": {
+          "ratio": 0.1846586143264553,
+          "ci_lo": NaN,
+          "ci_hi": NaN,
+          "n_rounds": 1
+        }
+      }
+    }
+  },
+  "n_home_rounds": 3,
+  "n_baselines": 5,
+  "ready": false
+}

@@ -1,0 +1,6 @@
+# 연구 3 대형 이벤트 더미. 스포츠·e스포츠 대형 중계가 있는 날짜(KST)를 적는다.
+# analysis/exposure.py는 여기 적힌 날짜를 event=1로 두고, 추가로 기준선에서
+# 공식 채널 하나가 동접 20,000명 이상이면 자동으로 event=1로 본다.
+auto_threshold_official_viewers: 20000
+dates: []
+#  - {date: "2026-12-01", label: "예: 국가대표 A매치 중계"}

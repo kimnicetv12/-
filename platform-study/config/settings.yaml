@@ -1,0 +1,38 @@
+# 수집 공통 설정. AGENTS.md의 윤리·수집 규칙을 코드로 강제하는 값들이다.
+# 값을 낮추면 규칙 위반이 되므로 최소값 아래로는 collector/polite.py가 거부한다.
+
+user_agent: "platform-concentration-study/0.1 (academic research; non-commercial; read-only)"
+
+rate_limit:
+  min_seconds_between_page_loads: 10      # 페이지 로드 사이 최소 간격
+  min_seconds_same_site: 30               # 같은 사이트 연속 요청 사이 최소 간격
+  request_timeout_seconds: 30
+
+# 차단 신호. 하나라도 보이면 기록하고 해당 사이트 수집을 중단한다.
+block_signals:
+  status_codes: [403, 429, 503]
+  body_markers:
+    - "Vercel Security Checkpoint"
+    - "captcha"
+    - "CAPTCHA"
+    - "cf-challenge"
+    - "Access Denied"
+    - "비정상적인 접근"
+
+paths:
+  db: data/streamrate.sqlite
+  raw_streamrate: data/raw/streamrate
+  raw_audit: data/raw/audit
+  log: data/logs/collect.log
+
+streamrate:
+  url: "https://stream-rate.com/viewership/"
+
+# 소규모 방송 정의 (RQ3)
+small_max_viewers: 49        # 동접 50명 미만
+
+analysis:
+  bootstrap_reps: 5000
+  random_seed: 20261125
+  top_ns: [50, 100, 150]
+  viewer_thresholds: [500, 1000, 5000]

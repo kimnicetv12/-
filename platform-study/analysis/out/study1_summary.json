@@ -1,0 +1,51 @@
+{
+  "snapshot_date": "2026-11-25",
+  "n_total": 555,
+  "composition": [
+    {
+      "platform": "both",
+      "category": "게임",
+      "n": 6
+    },
+    {
+      "platform": "chzzk",
+      "category": "게임",
+      "n": 189
+    },
+    {
+      "platform": "chzzk",
+      "category": "스포츠",
+      "n": 2
+    },
+    {
+      "platform": "chzzk",
+      "category": "토크·캠방",
+      "n": 68
+    },
+    {
+      "platform": "soop",
+      "category": "게임",
+      "n": 193
+    },
+    {
+      "platform": "soop",
+      "category": "스포츠",
+      "n": 4
+    },
+    {
+      "platform": "soop",
+      "category": "토크·캠방",
+      "n": 93
+    }
+  ],
+  "excluded": {
+    "sports": 6,
+    "simulcast": 6
+  },
+  "bootstrap_reps": 5000,
+  "seed": 20261125,
+  "figures": [
+    "paper/figures/fig1_rank_size.png",
+    "paper/figures/fig2_lorenz_top100.png"
+  ]
+}
