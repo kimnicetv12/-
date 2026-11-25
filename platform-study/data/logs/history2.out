@@ -76,3 +76,4 @@ INFO GET https://stream-rate.com/viewership/%EC%BC%80%EC%9D%B8/ -> 200 (37276 by
 INFO GET https://stream-rate.com/viewership/%EC%86%8C%EC%9A%B0%EB%A6%8E/ -> 200 (42231 bytes)
 INFO GET https://stream-rate.com/viewership/%EB%9D%BC%EC%BD%94%EC%BD%94RAKOKO/ -> 200 (46418 bytes)
 INFO GET https://stream-rate.com/viewership/%EC%9B%81/ -> 200 (35881 bytes)
+INFO GET https://stream-rate.com/viewership/%EA%B3%A0%EB%87%A8/ -> 200 (41173 bytes)
