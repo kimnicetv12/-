@@ -1,0 +1,35 @@
+{
+  "market": {
+    "per_user_hours_2026_08": {
+      "chzzk": 9.21,
+      "soop": 16.84
+    },
+    "ratio_soop_over_chzzk": 1.83,
+    "q3_watch_hours_gap_manh": 218.0
+  },
+  "coding_matrix": [
+    {
+      "platform": "치지직",
+      "n_policies": 10,
+      "진입": 5,
+      "중간": 4,
+      "상단": 3,
+      "노출": 4
+    },
+    {
+      "platform": "숲(SOOP)",
+      "n_policies": 8,
+      "진입": 6,
+      "중간": 5,
+      "상단": 2,
+      "노출": 2
+    }
+  ],
+  "figure": "paper/figures/fig4_policy_timeline.png",
+  "undated_policies": [
+    "C08",
+    "C09",
+    "S01",
+    "C10"
+  ]
+}

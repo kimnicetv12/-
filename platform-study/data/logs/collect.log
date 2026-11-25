@@ -1,0 +1,14 @@
+2026-11-25 02:14:09,609 INFO GET https://stream-rate.com/viewership/ -> 200 (434732 bytes)
+2026-11-25 02:14:09,865 INFO snapshot 2026-11-25: 555 rows, stored
+2026-11-25 02:16:01,350 INFO GET https://weflview.com/ranking/history -> 200 (1046642 bytes)
+2026-11-25 02:16:32,048 INFO GET https://weflview.com/streamer/ranking/stream -> 200 (573113 bytes)
+2026-11-25 02:23:00,326 INFO [20261125T1121-fbfb] home soop: 15 cards
+2026-11-25 02:24:51,446 INFO [20261125T1121-fbfb] home chzzk: 34 cards
+2026-11-25 02:27:01,664 INFO [20261125T1121-fbfb] baseline soop: 0 lives, reached_end=True, sorted_desc=0
+2026-11-25 02:29:12,441 INFO [20261125T1121-fbfb] baseline chzzk: 100 lives, reached_end=True, sorted_desc=0
+2026-11-25 02:38:50,436 INFO [20261125T1137-ab5a] home chzzk: 35 cards
+2026-11-25 02:40:40,895 INFO [20261125T1137-ab5a] home soop: 31 cards
+2026-11-25 02:45:14,803 WARNING baseline chzzk: 새 방송이 3번 연속 늘지 않아 멈춤 (n=118)
+2026-11-25 02:49:46,433 INFO [20261125T1137-ab5a] baseline chzzk: loaded 118 (min 51), total 1305 (category openLiveCount sum (217 categories)), end=False, sorted=1
+2026-11-25 02:52:05,817 INFO [20261125T1137-ab5a] baseline soop: loaded 294 (min 17), total 1140 (list totalCount), end=False, sorted=1
+2026-11-25 03:02:05,299 INFO [20261125T1152-fdd3] baseline chzzk: loaded 118 (min 49), total 1355 (category openLiveCount sum (219 categories)), end=False, sorted=1

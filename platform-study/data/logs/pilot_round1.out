@@ -1,0 +1,5 @@
+INFO [20261125T1137-ab5a] home chzzk: 35 cards
+INFO [20261125T1137-ab5a] home soop: 31 cards
+WARNING baseline chzzk: 새 방송이 3번 연속 늘지 않아 멈춤 (n=118)
+INFO [20261125T1137-ab5a] baseline chzzk: loaded 118 (min 51), total 1305 (category openLiveCount sum (217 categories)), end=False, sorted=1
+INFO [20261125T1137-ab5a] baseline soop: loaded 294 (min 17), total 1140 (list totalCount), end=False, sorted=1

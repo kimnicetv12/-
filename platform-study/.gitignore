@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+# 감사 원본(스크린샷·HTML)은 회차당 수 MB라 기본은 커밋하지 않는다. 시범 회차만 강제로 추가했다.
+data/raw/audit/*
+!data/raw/audit/.gitkeep

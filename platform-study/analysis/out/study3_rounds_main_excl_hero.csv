@@ -1,0 +1,3 @@
+﻿round_id,platform,time_slot,event,n_rec,n_rec_hakko,rec_hakko_share,baseline_round,n_base_loaded,n_base_big,total_lives,total_source,base_hakko_share,base_reached_end,exposure_ratio,rec_median_viewers,base_median_viewers
+20261125T1137-ab5a,chzzk,12,0,29,14,0.4827586206896552,20261125T1152-fdd3,118,117,1355,category openLiveCount sum (219 categories),0.9136531365313654,0,0.5283828198986129,114.0,105.5
+20261125T1137-ab5a,soop,12,0,27,7,0.25925925925925924,20261125T1137-ab5a,294,126,1140,list totalCount,0.8894736842105263,0,0.2914749068595222,269.0,41.0
