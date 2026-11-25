@@ -45,7 +45,8 @@ def snapshot_stats(b: pd.DataFrame, m: pd.Series, hakko_max: int) -> dict:
     total_v, total_n = int(m.total_viewers), int(m.total_lives)
     big = v[v > hakko_max]
     k1 = max(1, math.ceil(total_n * 0.01))
-    full = bool(m["mode"] == "full" and len(v) >= total_n * 0.98)
+    # full: 목록을 동접 0명 꼬리까지 받았다. 수집하는 10여 분 사이 새로 켠 방송은 빠질 수 있다(빠진 수는 기록)
+    full = bool(m["mode"] == "full" and len(v) and v.min() == 0)
     complete_big = bool(full or m.crossed_threshold == 1)  # 50명 이상 방송을 다 셌는지
     off = b[(b.official == 1) & (b.viewers > hakko_max)].viewers.sum()
     out = {
@@ -54,7 +55,7 @@ def snapshot_stats(b: pd.DataFrame, m: pd.Series, hakko_max: int) -> dict:
         "top1_share": v[0] / total_v if len(v) else np.nan,
         "top10_share": v[:10].sum() / total_v,
         "top1pct_n": k1, "top1pct_share": v[:k1].sum() / total_v,
-        "complete_above_threshold": int(complete_big), "n_loaded": len(v), "min_loaded": int(v.min()) if len(v) else None,
+        "complete_above_threshold": int(complete_big), "n_loaded": len(v), "n_missing": total_n - len(v), "min_loaded": int(v.min()) if len(v) else None,
         "hakko_live_share": 1 - len(big) / total_n if complete_big else np.nan,
         "hakko_viewer_share": (total_v - big.sum()) / total_v if complete_big else np.nan,
         "official_viewer_share": off / total_v,

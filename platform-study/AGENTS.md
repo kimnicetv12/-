@@ -15,9 +15,14 @@
 | 연구 | RQ | 코드 | 데이터 |
 |---|---|---|---|
 | 1 시청 집중도 횡단 | 2-A′ | `collector/streamrate.py`, `analysis/concentration.py` | stream-rate.com/viewership |
-| 2 종단 추적 | 4 | 같은 수집기 매일 1회, `analysis/longitudinal.py` | SQLite 날짜별 스냅샷 (최소 8주) |
+| 2a 30일 회고 패널 | 4 (H6 시범) | `collector/streamrate_history.py`, `analysis/mobility_history.py` | stream-rate 개인 기록 페이지 (방송일별) |
+| 2b 8주 전향 패널 | 4 (H6) | 연구 1 수집기 매일 1회, `analysis/longitudinal.py` | SQLite 날짜별 스냅샷 (최소 8주) |
 | 3 추천 노출 감사 | 3 | `collector/audit.py`, `analysis/exposure.py` | 비로그인 홈 + 전체 라이브 기준선 |
 | 4 정책 내용 분석 | 2-C, 1 | `data/policy/*.csv`, `analysis/policy.py` | 보도자료·기사 (최초 보도일 KST) |
+| 5 실시간 전수 스냅샷 | 2-A, 2-A′ (H2) | `collector/audit.py --baseline`, `analysis/live_snapshot.py` | 같은 시각 전체 라이브 + 카테고리 합 |
+
+가설 H1~H6과 주 지표·판정 기준은 원고 1.3절, 미검증 가설의 분석 계획은 부록 B에 고정돼 있다.
+계획에서 벗어난 분석은 원고에 '탐색'으로 표시한다. 논문 가치 평가는 `paper/ASSESSMENT.md`.
 
 ## 윤리·수집 규칙 (반드시 지킬 것)
 1. IP·프록시 순환, CAPTCHA 우회, 봇 탐지 회피, 가짜 계정 생성은 하지 않는다.

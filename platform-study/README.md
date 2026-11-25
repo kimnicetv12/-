@@ -7,7 +7,8 @@
 | 경로 | 내용 |
 |---|---|
 | `collector/polite.py` | robots.txt 확인, 10초·30초 간격, 차단 시 중단을 강제하는 HTTP 수집기 |
-| `collector/streamrate.py` | 연구 1·2: stream-rate 뷰어십 순위 → SQLite 날짜별 스냅샷 |
+| `collector/streamrate.py` | 연구 1·2b: stream-rate 뷰어십 순위 → SQLite 날짜별 스냅샷 |
+| `collector/streamrate_history.py` | 연구 2a: 개인 기록 페이지의 30일 방송일별 동접 → `daily_history` |
 | `collector/audit.py` | 연구 3: Playwright 비로그인 홈 추천 + 전체 라이브 기준선 |
 | `analysis/` | 연구별 분석 (`concentration`, `longitudinal`, `exposure`, `policy`) |
 | `config/` | `settings.yaml`(간격·경로·분석 설정), `selectors.yaml`(DOM 선택자·응답 패턴), `events.yaml`(대형 이벤트 날짜) |
@@ -28,7 +29,9 @@ pip install -r requirements.txt
 ## 한 번에 다시 계산하기
 ```bash
 python -m analysis.concentration   # 연구 1 → analysis/out/study1_*, 그림 1·2
-python -m analysis.longitudinal    # 연구 2 → study2_* (스냅샷이 쌓여야 의미 있음)
+python -m analysis.mobility_history # 연구 2a → study2h_*, 그림 3 (30일 회고 패널)
+python -m analysis.longitudinal    # 연구 2b → study2_* (스냅샷이 쌓여야 의미 있음)
+python -m analysis.live_snapshot   # 연구 5 → study5_*, 그림 5
 python -m analysis.exposure        # 연구 3 → study3_*
 python -m analysis.policy          # 연구 4 → study4_*, 그림 4
 python paper/render.py             # paper_template.md → paper.md (수치를 결과 파일에서 채움)
@@ -40,13 +43,16 @@ python -m pytest -q tests
 클라우드 세션은 사라지므로 장기 수집은 상시 켜진 컴퓨터에서 돌린다. 모든 시각은 KST.
 
 ```cron
-# 연구 1·2: 매일 1회 (stream-rate가 하루 1회 갱신)
+# 연구 1·2b: 매일 1회 (stream-rate가 하루 1회 갱신)
 30 11 * * *  cd /path/platform-study && python -m collector.streamrate
+# 연구 2a: 4주마다 한 번 30일 기록을 다시 받아 회고 패널을 이어 붙인다 (상위 100명 × 2 ≈ 100분)
+0 13 */28 * *  cd /path/platform-study && python -m collector.streamrate_history --top 100
 
 # 연구 3: 7일 × 12·18·22·02시 × 시간대당 4회. 각 시간대 첫 회차에만 기준선을 함께 받는다.
 0  12,18,22,2 * * *  cd /path/platform-study && python -m collector.audit --baseline
 15,30,45 12,18,22,2 * * *  cd /path/platform-study && python -m collector.audit
 ```
+- 기준선 회차(`--baseline`)는 연구 5 전수 스냅샷도 겸한다. 숲까지 전체를 받으려면 `--baseline-mode full`(숲 약 10분).
 - 한 회차의 홈 수집은 두 플랫폼 합쳐 약 4분(스크롤 사이 30초 × 3번 × 2)이라 "5분 안에 연달아" 조건을 지킨다.
 - 기준선(threshold 모드)은 하꼬 경계(동접 50명 미만)가 나올 때까지만 시청자순 목록을 내리고,
   전체 라이브 수는 숲은 목록 응답의 `totalCount`, 치지직은 카테고리 페이지의 `openLiveCount` 합으로 얻는다.

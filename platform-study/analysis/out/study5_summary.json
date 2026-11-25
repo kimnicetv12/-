@@ -1,7 +1,7 @@
 {
   "n_snapshots": {
-    "chzzk": 1,
-    "soop": 0
+    "chzzk": 2,
+    "soop": 1
   },
   "figure": "paper/figures/fig5_viewer_share_by_size.png",
   "rows": [
@@ -17,6 +17,7 @@
       "top1pct_share": 0.4588143896070265,
       "complete_above_threshold": 1,
       "n_loaded": 118,
+      "n_missing": 1237,
       "min_loaded": 49,
       "hakko_live_share": 0.9136531365313654,
       "hakko_viewer_share": 0.1818986167159412,
@@ -30,6 +31,60 @@
       "bin_500–999": 0.16558406525820582,
       "bin_1,000–4,999": 0.3701202011264809,
       "bin_5,000+": 0.0
+    },
+    {
+      "round_id": "20261125T1337-aae8",
+      "platform": "chzzk",
+      "total_lives": 1699,
+      "total_viewers": 61507,
+      "full_list": 0,
+      "top1_share": 0.06864259352594014,
+      "top10_share": 0.3844277887069764,
+      "top1pct_n": 17,
+      "top1pct_share": 0.48973287593282067,
+      "complete_above_threshold": 0,
+      "n_loaded": 99,
+      "n_missing": 1600,
+      "min_loaded": 86,
+      "hakko_live_share": NaN,
+      "hakko_viewer_share": NaN,
+      "official_viewer_share": 0.0,
+      "gini_all": NaN,
+      "partner_viewer_share": 0.34160339473555856,
+      "challenger_viewer_share": 0.1353504479164973,
+      "bin_0–49 (하꼬)": NaN,
+      "bin_50–99": NaN,
+      "bin_100–499": 0.18262961939291464,
+      "bin_500–999": 0.15346220755361178,
+      "bin_1,000–4,999": 0.4226348220527745,
+      "bin_5,000+": 0.0
+    },
+    {
+      "round_id": "20261125T1337-aae8",
+      "platform": "soop",
+      "total_lives": 1636,
+      "total_viewers": 88344,
+      "full_list": 1,
+      "top1_share": 0.14750294304084036,
+      "top10_share": 0.44797609345286604,
+      "top1pct_n": 17,
+      "top1pct_share": 0.5360862084578466,
+      "complete_above_threshold": 1,
+      "n_loaded": 1495,
+      "n_missing": 141,
+      "min_loaded": 0,
+      "hakko_live_share": 0.8924205378973105,
+      "hakko_viewer_share": 0.14529566241057684,
+      "official_viewer_share": 0.002139364303178484,
+      "gini_all": 0.8833768728466871,
+      "partner_viewer_share": NaN,
+      "challenger_viewer_share": NaN,
+      "bin_0–49 (하꼬)": 0.14529566241057684,
+      "bin_50–99": 0.06189441275015847,
+      "bin_100–499": 0.159795798243231,
+      "bin_500–999": 0.12939192248483203,
+      "bin_1,000–4,999": 0.22513130489903105,
+      "bin_5,000+": 0.27849089921217063
     }
   ]
 }

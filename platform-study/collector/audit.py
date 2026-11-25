@@ -443,12 +443,13 @@ def collect_baseline(browser, platform: str, sel: dict, raw_dir: Path, max_minut
             if at_end:
                 reached_end = True
                 break
-            if mode == "threshold" and last_viewers is not None and last_viewers <= hakko_max:
-                if crossed and extra_left <= 0:
-                    break
-                if crossed:
-                    extra_left -= 1
-                crossed = True
+            if last_viewers is not None and last_viewers <= hakko_max:
+                if mode == "threshold":
+                    if crossed and extra_left <= 0:
+                        break
+                    if crossed:
+                        extra_left -= 1
+                crossed = True  # full 모드도 경계를 넘었는지는 기록한다
             stall = stall + 1 if n == last_n else 0
             last_n = n
             if n > 0 and stall >= common["baseline_stall_scrolls"]:
@@ -487,7 +488,8 @@ def collect_baseline(browser, platform: str, sel: dict, raw_dir: Path, max_minut
             "crossed_threshold": int(crossed or reached_end),
             "total_lives": generic_total(cap.items) if platform == "soop" else None,
             "total_source": "list totalCount" if platform == "soop" else None, "total_complete": None,
-            "total_viewers": sum(seq) if reached_end else None}
+            # full 모드에서 동접 0명 꼬리까지 내려갔으면 목록 합을 전체 시청자로 본다(수집 중 새로 켠 방송은 빠짐)
+            "total_viewers": sum(seq) if (reached_end or (mode == "full" and seq and min(seq) == 0)) else None}
     return rows, reached_end, sorted_desc, meta
 
 

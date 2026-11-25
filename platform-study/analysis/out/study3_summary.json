@@ -151,6 +151,6 @@
     }
   },
   "n_home_rounds": 1,
-  "n_baselines": 2,
+  "n_baselines": 3,
   "ready": false
 }

@@ -1,0 +1,66 @@
+{
+  "snapshot_date": "2026-11-25",
+  "days": [
+    "2026-10-26",
+    "2026-11-24"
+  ],
+  "weeks": [
+    [
+      "2026-10-26",
+      "2026-11-01"
+    ],
+    [
+      "2026-11-02",
+      "2026-11-08"
+    ],
+    [
+      "2026-11-09",
+      "2026-11-15"
+    ],
+    [
+      "2026-11-16",
+      "2026-11-22"
+    ]
+  ],
+  "n_streamers": {
+    "chzzk": 48,
+    "soop": 0
+  },
+  "n_pages_ok": 48,
+  "mean_turnover_top20": {
+    "chzzk": 0.18333333333333332,
+    "soop": NaN
+  },
+  "mean_spearman_top50": {
+    "chzzk": 0.8610775938626194,
+    "soop": NaN
+  },
+  "mean_abs_rank_change_top50": {
+    "chzzk": 4.783369408369409,
+    "soop": NaN
+  },
+  "first_last_turnover_top20": {
+    "chzzk": 0.25,
+    "soop": NaN
+  },
+  "spearman_boot": {
+    "chzzk": 0.8610603951370183,
+    "soop": NaN,
+    "diff_soop_minus_chzzk": NaN,
+    "ci": [
+      NaN,
+      NaN
+    ]
+  },
+  "cv_median": {
+    "chzzk": 0.35621965697013763
+  },
+  "cv_diff_soop_minus_chzzk": {
+    "est": NaN,
+    "ci": [
+      NaN,
+      NaN
+    ]
+  },
+  "figure": "paper/figures/fig3_weekly_rank_history.png"
+}

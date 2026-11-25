@@ -114,6 +114,78 @@ def study1(v: dict) -> None:
          ["차이의 95% 구간", f"{pp(PRIOR['ci'][0])} ~ {pp(PRIOR['ci'][1])}", v["s1_ci_top10_100"], "결론 동일(0 포함)"]])
 
 
+def study1_zipf(v: dict) -> None:
+    z = pd.read_csv(OUT / "study1_zipf.csv")
+    r = z[(z.scenario == "main") & (z.top_n == 100)].iloc[0]
+    v["s1_zipf_chzzk_100"] = f"{r.chzzk_alpha:.2f}"
+    v["s1_zipf_soop_100"] = f"{r.soop_alpha:.2f}"
+    v["s1_zipf_ci_100"] = f"{r.ci_lo:+.2f} ~ {r.ci_hi:+.2f}"
+    v["table_s1_zipf"] = md_table(
+        ["시나리오", "상위 N", "치지직 α", "숲 α", "차이(숲−치지직) [95% CI]"],
+        [[SCEN[x.scenario], x.top_n, f"{x.chzzk_alpha:.2f}", f"{x.soop_alpha:.2f}",
+          f"{x.diff_soop_minus_chzzk:+.2f} [{x.ci_lo:+.2f}, {x.ci_hi:+.2f}]"] for x in z.itertuples()])
+
+
+def study2a(v: dict) -> None:
+    p = OUT / "study2h_summary.json"
+    keys = ["s2a_days", "s2a_n_chzzk", "s2a_n_soop", "s2a_turn_chzzk", "s2a_turn_soop", "s2a_rho_chzzk",
+            "s2a_rho_soop", "s2a_rho_ci", "s2a_cv_chzzk", "s2a_cv_soop", "s2a_cv_ci", "s2a_fl_chzzk", "s2a_fl_soop",
+            "s2a_mar_chzzk", "s2a_mar_soop", "table_s2a"]
+    if not p.exists():
+        v.update({k: "—" for k in keys}); v["table_s2a"] = "_회고 패널 수집 전_"
+        return
+    s = json.loads(p.read_text(encoding="utf-8"))
+    v["s2a_days"] = f"{s['days'][0]} ~ {s['days'][1]}"
+    for pf in ("chzzk", "soop"):
+        v[f"s2a_n_{pf}"] = s["n_streamers"][pf]
+        v[f"s2a_turn_{pf}"] = pct(s["mean_turnover_top20"].get(pf))
+        v[f"s2a_rho_{pf}"] = f"{s['mean_spearman_top50'].get(pf, float('nan')):.2f}"
+        v[f"s2a_cv_{pf}"] = f"{s['cv_median'].get(pf, float('nan')):.2f}"
+        v[f"s2a_fl_{pf}"] = pct(s["first_last_turnover_top20"].get(pf))
+        v[f"s2a_mar_{pf}"] = f"{s['mean_abs_rank_change_top50'].get(pf, float('nan')):.1f}"
+    b = s["spearman_boot"]
+    v["s2a_rho_ci"] = f"{b['diff_soop_minus_chzzk']:+.2f} [{b['ci'][0]:+.2f}, {b['ci'][1]:+.2f}]"
+    c = s["cv_diff_soop_minus_chzzk"]
+    v["s2a_cv_ci"] = f"{c['est']:+.2f} [{c['ci'][0]:+.2f}, {c['ci'][1]:+.2f}]"
+    pm = pd.read_csv(OUT / "study2h_pairs.csv")
+    weeks = s["weeks"]
+    lab = lambda w: f"{weeks[w - 1][0][5:]}~"
+    v["table_s2a"] = md_table(
+        ["플랫폼", "비교", "상위20 교체율", "상위50 스피어만", "상위50 평균 순위 변화", "짝지은 인원"],
+        [[PF[r.platform], f"{lab(r.from_week)} → {lab(r.to_week)}", pct(r.turnover_top20),
+          "—" if pd.isna(r.spearman_top50) else f"{r.spearman_top50:.2f}",
+          "—" if pd.isna(r.mean_abs_rank_change_top50) else f"{r.mean_abs_rank_change_top50:.1f}", r.n_matched]
+         for r in pm.itertuples()])
+
+
+def study5(v: dict) -> None:
+    p = OUT / "study5_snapshots.csv"
+    df = pd.read_csv(p) if p.exists() and p.stat().st_size > 5 else pd.DataFrame()
+    for pf in ("chzzk", "soop"):
+        d = df[df.platform == pf] if len(df) else df
+        dc = d[d.complete_above_threshold == 1] if len(d) else d
+        v[f"s5_n_{pf}"] = len(d)
+        v[f"s5_top10_{pf}"] = pct(d.top10_share.mean()) if len(d) else "—"
+        v[f"s5_top1pct_{pf}"] = pct(d.top1pct_share.mean()) if len(d) else "—"
+        v[f"s5_hakko_live_{pf}"] = pct(dc.hakko_live_share.mean()) if len(dc) else "—"
+        v[f"s5_hakko_viewer_{pf}"] = pct(dc.hakko_viewer_share.mean()) if len(dc) else "—"
+        v[f"s5_official_{pf}"] = pct(d.official_viewer_share.mean(), 2) if len(d) else "—"
+        v[f"s5_lives_{pf}"] = num(d.total_lives.mean()) if len(d) else "—"
+        v[f"s5_viewers_{pf}"] = num(d.total_viewers.mean()) if len(d) else "—"
+    if len(df):
+        rows = []
+        for r in df.itertuples():
+            t = r.round_id
+            rows.append([f"{t[4:6]}/{t[6:8]} {t[9:11]}:{t[11:13]}", PF[r.platform], num(r.total_lives), num(r.total_viewers),
+                         pct(r.top10_share), f"{pct(r.top1pct_share)} ({r.top1pct_n}개)", pct(r.hakko_live_share),
+                         pct(r.hakko_viewer_share), pct(r.official_viewer_share, 2),
+                         pct(getattr(r, "partner_viewer_share", float("nan"))) if r.platform == "chzzk" else "—"])
+        v["table_s5"] = md_table(["시각(KST)", "플랫폼", "전체 방송", "전체 시청자", "상위 10개 방송 몫", "상위 1% 방송 몫",
+                                  "하꼬 방송 비율", "하꼬의 시청자 몫", "공식 채널 몫", "파트너 몫"], rows)
+    else:
+        v["table_s5"] = "_전수 스냅샷 없음_"
+
+
 def study2(v: dict) -> None:
     s = json.loads((OUT / "study2_summary.json").read_text(encoding="utf-8"))
     v["s2_n_snapshots"] = s["n_snapshots"]
@@ -200,7 +272,7 @@ def study4(v: dict) -> None:
 
 def main() -> int:
     v: dict = {}
-    study1(v); study2(v); study3(v); study4(v)
+    study1(v); study1_zipf(v); study2(v); study2a(v); study3(v); study4(v); study5(v)
     tpl = (HERE / "paper_template.md").read_text(encoding="utf-8")
     missing = sorted(set(re.findall(r"\{\{(\w+)\}\}", tpl)) - set(v))
     if missing:

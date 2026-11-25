@@ -1,0 +1,25 @@
+INFO history: snapshot 2026-11-25, 200 targets, 200 to fetch
+INFO GET https://stream-rate.com/viewership/%ED%95%98%EB%82%98%EC%9A%94%ED%9E%88%EC%9A%94%EB%A6%AC/ -> 200 (42625 bytes)
+INFO GET https://stream-rate.com/viewership/%ED%95%9C%EB%8F%99%EC%88%99/ -> 200 (41283 bytes)
+INFO GET https://stream-rate.com/viewership/%ED%86%A0%ED%82%A4%EB%85%B8%EB%A9%94%EB%A6%AC/ -> 200 (42682 bytes)
+INFO GET https://stream-rate.com/viewership/%EB%9E%84%EB%A1%9C/ -> 200 (47730 bytes)
+INFO GET https://stream-rate.com/viewership/%EC%9A%B8%ED%94%84/ -> 200 (47181 bytes)
+INFO GET https://stream-rate.com/viewership/%ED%92%8D%EC%9B%94%EB%9F%89/ -> 200 (47674 bytes)
+INFO GET https://stream-rate.com/viewership/%EA%B4%B4%EB%AC%BC%EC%A5%90/ -> 200 (47131 bytes)
+INFO GET https://stream-rate.com/viewership/%ED%83%AC%ED%83%AC%EB%B2%84%EB%A6%B0/ -> 200 (47381 bytes)
+INFO GET https://stream-rate.com/viewership/../i/양띵/ -> 200 (54837 bytes)
+Traceback (most recent call last):
+  File "<frozen runpy>", line 203, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/home/user/-/platform-study/collector/streamrate_history.py", line 129, in <module>
+    sys.exit(main())
+             ~~~~^^
+  File "/home/user/-/platform-study/collector/streamrate_history.py", line 113, in main
+    with gzip.open(raw_dir / f"{slug[:120]}.html.gz", "wt", encoding="utf-8") as f:
+         ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.13/gzip.py", line 66, in open
+    binary_file = GzipFile(filename, gz_mode, compresslevel)
+  File "/usr/local/lib/python3.13/gzip.py", line 205, in __init__
+    fileobj = self.myfileobj = builtins.open(filename, mode or 'rb')
+                               ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/home/user/-/platform-study/data/raw/streamrate/history-2026-11-25/../i/양띵.html.gz'

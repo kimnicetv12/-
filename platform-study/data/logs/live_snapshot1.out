@@ -1,0 +1,4 @@
+WARNING baseline chzzk: 새 방송이 3번 연속 늘지 않아 멈춤 (n=99)
+INFO [20261125T1337-aae8] baseline chzzk: loaded 99 (min 86), total 1699 (category openLiveCount sum (267 categories)), end=False, sorted=1
+WARNING baseline soop: 새 방송이 3번 연속 늘지 않아 멈춤 (n=1495)
+INFO [20261125T1337-aae8] baseline soop: loaded 1495 (min 0), total 1636 (list totalCount), end=False, sorted=0

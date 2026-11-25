@@ -63,3 +63,28 @@ def test_audit_helpers():
             {"href": "https://chzzk.naver.com/live/" + "a" * 32, "top": 10, "left": 5, "section": None, "screen": 2}]
     rows = build_home_rows("chzzk", cfg, seen, resp, [])
     assert len(rows) == 1 and rows[0]["section"] == "신입" and rows[0]["screen"] == 1
+
+
+def test_history_parsers():
+    from datetime import date
+    from collector.streamrate_history import page_url, parse_history
+    html = ('<table><tr><th>날짜</th><th>방송 시간</th><th>평균 시청자</th><th>최고 시청자</th><th>주 카테고리</th></tr>'
+            '<tr><td>11/24(화)</td><td>8.5시간</td><td>24,194</td><td>45,053</td><td>리그 오브 레전드</td></tr>'
+            '<tr><td>12/30(화)</td><td>1.0시간</td><td>10</td><td>12</td><td>–</td></tr></table>')
+    rows = parse_history(html, date(2026, 11, 25))
+    assert rows[0] == {"day": "2026-11-24", "hours": 8.5, "avg_ccv": 24194, "peak_ccv": 45053,
+                       "main_category": "리그 오브 레전드"}
+    assert rows[1]["day"] == "2025-12-30" and rows[1]["main_category"] is None
+    assert page_url("../i/양띵") == "https://stream-rate.com/i/양띵/"
+
+
+def test_live_snapshot_stats():
+    import pandas as pd
+    from analysis.live_snapshot import snapshot_stats
+    b = pd.DataFrame({"viewers": [500, 300, 100, 60, 40], "official": [1, 0, 0, 0, 0], "tier": [None] * 5})
+    m = pd.Series({"round_id": "r", "platform": "chzzk", "total_viewers": 1100, "total_lives": 10,
+                   "mode": "threshold", "crossed_threshold": 1})
+    out = snapshot_stats(b, m, 49)
+    assert out["hakko_live_share"] == pytest.approx(0.6)
+    assert out["hakko_viewer_share"] == pytest.approx((1100 - 960) / 1100)
+    assert out["official_viewer_share"] == pytest.approx(500 / 1100)

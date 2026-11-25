@@ -58,7 +58,7 @@ def parse_history(html: str, snapshot: date) -> list[dict]:
             table = tb
             break
     if table is None:
-        return []
+        return parse_profile_chart(html, snapshot)
     rows = []
     for tr in table.find_all("tr")[1:]:
         tds = [td.get_text(strip=True) for td in tr.find_all("td")]
@@ -75,6 +75,29 @@ def parse_history(html: str, snapshot: date) -> list[dict]:
                      "avg_ccv": _int(tds[2]), "peak_ccv": _int(tds[3]),
                      "main_category": tds[4] if len(tds) > 4 and tds[4] not in ("–", "-") else None})
     return rows
+
+
+def parse_profile_chart(html: str, snapshot: date) -> list[dict]:
+    """기록 표가 없는 프로필 페이지(/i/<이름>/): '방송일별 동시 시청자' 그래프의 점(MM/DD · N명)만 읽는다."""
+    soup = BeautifulSoup(html, "lxml")
+    head = next((h for h in soup.find_all("h2") if "방송일별 동시 시청자" in h.get_text()), None)
+    fig = head.find_next("figure") if head else None
+    if fig is None:
+        return []
+    rows = []
+    for m in re.finditer(r"(\d{1,2})/(\d{1,2}) · ([\d,]+)명", fig.get_text(" ")):
+        month, day = int(m.group(1)), int(m.group(2))
+        year = snapshot.year - 1 if month > snapshot.month else snapshot.year
+        rows.append({"day": date(year, month, day).isoformat(), "hours": None, "avg_ccv": _int(m.group(3)),
+                     "peak_ccv": None, "main_category": None})
+    return rows
+
+
+def page_url(slug: str) -> str:
+    """명단의 링크는 대부분 기록 페이지 slug지만, 일부는 프로필 페이지(../i/<이름>)로만 이어진다."""
+    if slug.startswith("../i/"):
+        return f"https://stream-rate.com/i/{slug[5:]}/"
+    return f"https://stream-rate.com/viewership/{slug}/"
 
 
 def main(argv=None) -> int:
@@ -98,7 +121,7 @@ def main(argv=None) -> int:
     session = PoliteSession()
     snap_d = date.fromisoformat(snap)
     for i, (slug, name, pf) in enumerate(todo, 1):
-        url = f"https://stream-rate.com/viewership/{slug}/"
+        url = page_url(slug)
         try:
             resp = session.get(url)
         except BlockedError as e:
@@ -110,7 +133,7 @@ def main(argv=None) -> int:
             log.warning("history %s failed: %r", slug, e)
             continue
         resp.encoding = "utf-8"
-        with gzip.open(raw_dir / f"{slug[:120]}.html.gz", "wt", encoding="utf-8") as f:
+        with gzip.open(raw_dir / f"{slug.replace('/', '_')[:120]}.html.gz", "wt", encoding="utf-8") as f:
             f.write(resp.text)
         rows = parse_history(resp.text, snap_d)
         with con:

@@ -94,34 +94,32 @@ def boot_diff_median(a, b, reps, seed):
 
 
 def boot_spearman_diff(wk, weeks_pairs, reps, seed):
-    """방송인을 다시 뽑아 순위를 다시 매긴 뒤, 주간 스피어만 평균의 플랫폼 차이(숲−치지직)."""
+    """방송인을 다시 뽑아 상위 50명을 다시 고른 뒤, 연속 주간 스피어만 평균의 플랫폼 차이(숲−치지직)."""
     rng = np.random.default_rng(seed)
+    mats = {pf: wk[wk.platform == pf].pivot_table(index="slug", columns="week", values="ccv")
+            for pf in PLATFORMS}
 
-    def mean_rho(sub):
+    def mean_rho(m: pd.DataFrame) -> float:
+        if m.empty:
+            return np.nan
+        top = m.loc[m.mean(axis=1).sort_values(ascending=False).index[:TOP_SPEARMAN]]
         vals = []
         for w1, w2 in weeks_pairs:
-            a, b = sub[sub.week == w1], sub[sub.week == w2]
-            m = a[["slug", "ccv"]].merge(b[["slug", "ccv"]], on="slug")
-            if len(m) > 3:
-                vals.append(spearmanr(m.ccv_x, m.ccv_y).statistic)
-        return np.mean(vals) if vals else np.nan
+            if w1 in top and w2 in top:
+                pair = top[[w1, w2]].dropna()
+                if len(pair) > 3:
+                    vals.append(spearmanr(pair[w1], pair[w2]).statistic)
+        return float(np.mean(vals)) if vals else np.nan
 
-    def top(sub):
-        keep = sub.groupby("slug").ccv.mean().sort_values(ascending=False).index[:TOP_SPEARMAN]
-        return sub[sub.slug.isin(keep)]
-
-    est = {pf: mean_rho(top(wk[wk.platform == pf])) for pf in PLATFORMS}
+    est = {pf: mean_rho(mats[pf]) for pf in PLATFORMS}
     diffs = []
-    slugs = {pf: wk[wk.platform == pf].slug.unique() for pf in PLATFORMS}
-    for _ in range(reps // 5):  # 순위 재계산이 무거워 1,000회
+    for _ in range(reps):
         r = {}
         for pf in PLATFORMS:
-            pick = rng.choice(slugs[pf], slugs[pf].size)
-            sub = pd.concat([wk[(wk.platform == pf) & (wk.slug == s)].assign(slug=f"{s}#{i}")
-                             for i, s in enumerate(pick)])
-            r[pf] = mean_rho(top(sub))
+            m = mats[pf]
+            r[pf] = mean_rho(m.iloc[rng.integers(0, len(m), len(m))].reset_index(drop=True)) if len(m) else np.nan
         diffs.append(r["soop"] - r["chzzk"])
-    lo, hi = np.nanquantile(diffs, [0.025, 0.975])
+    lo, hi = np.nanquantile(diffs, [0.025, 0.975]) if np.isfinite(diffs).any() else (np.nan, np.nan)
     return est, float(est["soop"] - est["chzzk"]), float(lo), float(hi)
 
 
@@ -165,8 +163,11 @@ def main() -> int:
     pm.to_csv(OUT / "study2h_pairs.csv", index=False, encoding="utf-8-sig")
     cv = cv_by_streamer(df)
     cv.to_csv(OUT / "study2h_cv.csv", index=False, encoding="utf-8-sig")
-    cv_diff = boot_diff_median(cv[cv.platform == "chzzk"].cv, cv[cv.platform == "soop"].cv, s["bootstrap_reps"],
-                               s["random_seed"])
+    if set(cv.platform) >= set(PLATFORMS):
+        cv_diff = boot_diff_median(cv[cv.platform == "chzzk"].cv, cv[cv.platform == "soop"].cv,
+                                   s["bootstrap_reps"], s["random_seed"])
+    else:
+        cv_diff = (np.nan, np.nan, np.nan)
     rho_est, rho_diff, rho_lo, rho_hi = boot_spearman_diff(wk, pairs, s["bootstrap_reps"], s["random_seed"])
     consec = pm[pm.to_week - pm.from_week == 1]
     summary = {

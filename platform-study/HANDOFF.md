@@ -10,7 +10,11 @@
   시범 1회차 `20261125T1137-ab5a`(홈 두 플랫폼 + 숲 기준선) + 치지직 기준선 재수집 `20261125T1152-fdd3`.
   시범 노출 비율: 치지직 0.53, 숲 0.29 (상단 히어로 제외, n=1이라 판정 안 함)
 - [x] 원고 템플릿·렌더러·docx 빌더 (`paper/`), `paper/paper.md`·`paper/paper.docx` 초고
-- [x] 테스트 5개 (`tests/test_parsers.py`)
+- [x] 테스트 7개 (`tests/test_parsers.py`)
+- [x] **확장(2026-11-25 오후)**: 연구 2a 30일 회고 패널(`collector/streamrate_history.py`, `analysis/mobility_history.py`),
+  연구 5 실시간 전수 스냅샷(`analysis/live_snapshot.py`, 기준선 메타에 `total_viewers` 추가), 연구 1 순위-규모 기울기(`study1_zipf.csv`)
+- [x] **재정비**: 원고를 '중계권 집중 vs 스타 집중' 틀과 가설 H1~H6으로 다시 짰다. 부록 B에 H2·H5·H6 사전 분석 계획.
+  논문 가치 평가는 `paper/ASSESSMENT.md`
 
 ## 남은 것 (순서대로)
 1. **연구 2 수집 8주**: `python -m collector.streamrate`를 매일 1회. 클라우드 세션은 사라지므로 상시 켜진 컴퓨터의 cron에서 돌린다 (README "수집 일정").
@@ -22,6 +26,10 @@
    비교를 맞추려고 주 지표는 양쪽 히어로를 빼고 계산한다(`main_excl_hero`). 숲 히어로까지 넣으려면 선택자를 추가해야 한다.
 4. 참고문헌 서지 확인, 정책 코딩표의 `검색 요약`·`2차 출처` 행을 원문으로 확인.
 5. 매번 분석을 다시 돌린 뒤 `python paper/render.py && python paper/build_docx.py`.
+
+## 예약된 수집 (이 세션에 send_later로 걸어 둠)
+- 2026-11-25 18:05 KST, 22:05 KST: `collector.audit --baseline --baseline-mode full` 한 회차씩 → 저녁 시간대 연구 3·5 자료.
+  세션이 끝나 있으면 사람이 같은 명령을 돌리면 된다.
 
 ## 연구 3 기준선의 제약 (중요)
 - 치지직 웹은 시청자순 목록을 **120개(20 × 6페이지)까지만** 불러온다. 120번째가 동접 49 이하일 때만 50명 이상 방송을 다 센 것이다
