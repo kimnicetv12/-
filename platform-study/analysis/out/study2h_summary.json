@@ -23,43 +23,44 @@
     ]
   ],
   "n_streamers": {
-    "chzzk": 48,
-    "soop": 0
+    "chzzk": 98,
+    "soop": 99
   },
-  "n_pages_ok": 48,
+  "n_pages_ok": 197,
   "mean_turnover_top20": {
-    "chzzk": 0.18333333333333332,
-    "soop": NaN
+    "chzzk": 0.19999999999999996,
+    "soop": 0.21666666666666667
   },
   "mean_spearman_top50": {
-    "chzzk": 0.8610775938626194,
-    "soop": NaN
+    "chzzk": 0.8563758007931148,
+    "soop": 0.706195461890888
   },
   "mean_abs_rank_change_top50": {
-    "chzzk": 4.783369408369409,
-    "soop": NaN
+    "chzzk": 8.611586452762923,
+    "soop": 10.73479020979021
   },
   "first_last_turnover_top20": {
     "chzzk": 0.25,
-    "soop": NaN
+    "soop": 0.30000000000000004
   },
   "spearman_boot": {
-    "chzzk": 0.8610603951370183,
-    "soop": NaN,
-    "diff_soop_minus_chzzk": NaN,
+    "chzzk": 0.8543311086082327,
+    "soop": 0.7519551351640793,
+    "diff_soop_minus_chzzk": -0.10237597344415339,
     "ci": [
-      NaN,
-      NaN
+      -0.295990514600022,
+      0.06928757381353466
     ]
   },
   "cv_median": {
-    "chzzk": 0.35621965697013763
+    "chzzk": 0.3623076644159345,
+    "soop": 0.4628958226970427
   },
   "cv_diff_soop_minus_chzzk": {
-    "est": NaN,
+    "est": 0.10058815828110823,
     "ci": [
-      NaN,
-      NaN
+      0.027496935838920322,
+      0.15075424105476765
     ]
   },
   "figure": "paper/figures/fig3_weekly_rank_history.png"
