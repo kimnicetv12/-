@@ -100,6 +100,26 @@ def full_list_counts(df: pd.DataFrame, thresholds) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def zipf_alpha(values, n: int) -> float:
+    """상위 n명의 순위-규모 기울기: log(동접) = c - alpha * log(순위). alpha가 클수록 위로 가파르다."""
+    v = np.sort(np.asarray(values, dtype=float))[::-1][:n]
+    ranks = np.arange(1, v.size + 1)
+    return float(-np.polyfit(np.log(ranks), np.log(v), 1)[0])
+
+
+def zipf_table(df: pd.DataFrame, reps: int, seed: int) -> pd.DataFrame:
+    """명단 크기(어디까지 넣었는지)에 덜 민감한 집중 지표. 상위 n명 안에서 기울기만 본다."""
+    rows = []
+    for scen, kw in SCENARIOS.items():
+        vals = {p: platform_values(df, p, **kw) for p in PLATFORMS}
+        for n in (50, 100):
+            est, lo, hi = bootstrap_diff(vals["chzzk"][:n], vals["soop"][:n], lambda x: zipf_alpha(x, n), reps, seed)
+            rows.append({"scenario": scen, "top_n": n, "chzzk_alpha": zipf_alpha(vals["chzzk"], n),
+                         "soop_alpha": zipf_alpha(vals["soop"], n), "diff_soop_minus_chzzk": est,
+                         "ci_lo": lo, "ci_hi": hi})
+    return pd.DataFrame(rows)
+
+
 def figures(df: pd.DataFrame, date: str) -> list[str]:
     import matplotlib
     matplotlib.use("Agg")
@@ -147,6 +167,8 @@ def main(argv=None) -> int:
 
     table = describe(df, s["top_ns"], s["viewer_thresholds"], s["bootstrap_reps"], s["random_seed"])
     table.to_csv(OUT / "study1_concentration.csv", index=False, encoding="utf-8-sig")
+    zipf_table(df, s["bootstrap_reps"], s["random_seed"]).to_csv(OUT / "study1_zipf.csv", index=False,
+                                                                 encoding="utf-8-sig")
     counts = full_list_counts(df, s["viewer_thresholds"])
     counts.to_csv(OUT / "study1_full_list.csv", index=False, encoding="utf-8-sig")
     figs = figures(df, date)

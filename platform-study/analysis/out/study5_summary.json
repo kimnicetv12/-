@@ -1,0 +1,35 @@
+{
+  "n_snapshots": {
+    "chzzk": 1,
+    "soop": 0
+  },
+  "figure": "paper/figures/fig5_viewer_share_by_size.png",
+  "rows": [
+    {
+      "round_id": "20261125T1152-fdd3",
+      "platform": "chzzk",
+      "total_lives": 1355,
+      "total_viewers": 46339,
+      "full_list": 0,
+      "top1_share": 0.06631563046246143,
+      "top10_share": 0.391225533567837,
+      "top1pct_n": 14,
+      "top1pct_share": 0.4588143896070265,
+      "complete_above_threshold": 1,
+      "n_loaded": 118,
+      "min_loaded": 49,
+      "hakko_live_share": 0.9136531365313654,
+      "hakko_viewer_share": 0.1818986167159412,
+      "official_viewer_share": 0.0,
+      "gini_all": NaN,
+      "partner_viewer_share": 0.2569541854593323,
+      "challenger_viewer_share": 0.1704611666199098,
+      "bin_0–49 (하꼬)": 0.1818986167159412,
+      "bin_50–99": 0.08047217246811542,
+      "bin_100–499": 0.2019249444312566,
+      "bin_500–999": 0.16558406525820582,
+      "bin_1,000–4,999": 0.3701202011264809,
+      "bin_5,000+": 0.0
+    }
+  ]
+}

@@ -81,6 +81,7 @@ CREATE TABLE IF NOT EXISTS audit_baseline_meta (
     total_lives INTEGER,             -- 같은 시각 전체 라이브 수
     total_source TEXT,
     total_complete INTEGER,          -- 전체 수 산출 응답을 끝까지 받았는지
+    total_viewers INTEGER,           -- 같은 시각 전체 동시 시청자 (치지직: 카테고리 합, 숲: 전체 목록 합)
     PRIMARY KEY (round_id, platform)
 );
 """
@@ -228,8 +229,8 @@ def chzzk_has_next(responses: list[dict], required: str = "") -> bool:
     return True
 
 
-def chzzk_category_total(responses: list[dict]) -> tuple[int, int, bool]:
-    """카테고리 응답의 openLiveCount 합, 카테고리 수, 끝까지 받았는지."""
+def chzzk_category_total(responses: list[dict], field: str = "openLiveCount") -> tuple[int, int, bool]:
+    """카테고리 응답의 field(openLiveCount 또는 concurrentUserCount) 합, 카테고리 수, 끝까지 받았는지."""
     cats, last_next = {}, True
     for r in responses:
         if "size=6" in r.get("url", ""):  # 홈 사이드바용 상위 6개 응답은 중복이라 뺀다
@@ -239,7 +240,7 @@ def chzzk_category_total(responses: list[dict]) -> tuple[int, int, bool]:
         except (ValueError, KeyError, AttributeError):
             continue
         for c in content.get("data") or []:
-            cats[c.get("categoryId")] = c.get("openLiveCount") or 0
+            cats[c.get("categoryId")] = c.get(field) or 0
         last_next = bool((content.get("page") or {}).get("next"))
     return sum(cats.values()), len(cats), not last_next
 
@@ -485,7 +486,8 @@ def collect_baseline(browser, platform: str, sel: dict, raw_dir: Path, max_minut
     meta = {"mode": mode, "n_loaded": len(rows), "min_loaded_viewers": min(seq) if seq else None,
             "crossed_threshold": int(crossed or reached_end),
             "total_lives": generic_total(cap.items) if platform == "soop" else None,
-            "total_source": "list totalCount" if platform == "soop" else None, "total_complete": None}
+            "total_source": "list totalCount" if platform == "soop" else None, "total_complete": None,
+            "total_viewers": sum(seq) if reached_end else None}
     return rows, reached_end, sorted_desc, meta
 
 
@@ -521,17 +523,19 @@ def collect_chzzk_total(browser, sel: dict, raw_dir: Path, max_minutes: float, l
     finally:
         ctx.close()
     total, ncat, complete = chzzk_category_total(cap.items)
+    viewers, _, _ = chzzk_category_total(cap.items, "concurrentUserCount")
     return {"total_lives": total, "total_source": f"category openLiveCount sum ({ncat} categories)",
-            "total_complete": int(complete)}
+            "total_complete": int(complete), "total_viewers": viewers}
 
 
 def connect() -> sqlite3.Connection:
     con = sqlite3.connect(ROOT / load_settings()["paths"]["db"])
     con.executescript(SCHEMA)
-    for table in ("audit_home", "audit_baseline"):  # 예전 스키마에 tier 열 추가
+    for table, col in (("audit_home", "tier"), ("audit_baseline", "tier"),
+                       ("audit_baseline_meta", "total_viewers")):  # 예전 스키마에 열 추가
         cols = {r[1] for r in con.execute(f"PRAGMA table_info({table})")}
-        if "tier" not in cols:
-            con.execute(f"ALTER TABLE {table} ADD COLUMN tier TEXT")
+        if col not in cols:
+            con.execute(f"ALTER TABLE {table} ADD COLUMN {col} {'TEXT' if col == 'tier' else 'INTEGER'}")
     return con
 
 
@@ -627,15 +631,16 @@ def main(argv=None) -> int:
                         time.sleep(30)
                         meta.update(collect_chzzk_total(browser, sel, raw_dir, max_min, log))
                     elif end:
-                        meta.update({"total_lives": len(rows), "total_source": "full list", "total_complete": 1})
+                        meta.update({"total_lives": len(rows), "total_source": "full list", "total_complete": 1,
+                                     "total_viewers": sum(r["viewers"] or 0 for r in rows)})
                     with con:
                         con.executemany("INSERT INTO audit_baseline VALUES (?,?,?,?,?,?,?,?,?)",
                                         [(round_id, pf, r["channel_id"], r["live_id"], r["channel"], r["viewers"],
                                           r["category"], r["official"], r.get("tier")) for r in rows])
-                        con.execute("INSERT OR REPLACE INTO audit_baseline_meta VALUES (?,?,?,?,?,?,?,?,?)",
+                        con.execute("INSERT OR REPLACE INTO audit_baseline_meta VALUES (?,?,?,?,?,?,?,?,?,?)",
                                     (round_id, pf, meta["mode"], meta["n_loaded"], meta["min_loaded_viewers"],
                                      meta["crossed_threshold"], meta["total_lives"], meta["total_source"],
-                                     meta["total_complete"]))
+                                     meta["total_complete"], meta.get("total_viewers")))
                     ok = rows and (end or meta["crossed_threshold"]) and meta["total_lives"]
                     save_run(con, round_id, pf, "baseline", started, "ok" if ok else "incomplete", len(rows),
                              int(end), desc, json.dumps(meta, ensure_ascii=False), raw_dir)
